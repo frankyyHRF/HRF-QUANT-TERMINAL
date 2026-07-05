@@ -21,7 +21,7 @@ st.markdown("""
 
 st.title("🏛️ HRF QUANT TERMINAL — V6 PLATFORM")
 st.caption("Professional Multi-Regime Micro-Structure Analysis Engine | Bitcoin Data Sourced via BNC Core Nodes")
-st.hr()
+st.divider()
 
 # --- SIDEBAR CONTROL UNIT ---
 st.sidebar.header("🎛️ Terminal Parameters")
