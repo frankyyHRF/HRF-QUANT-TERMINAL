@@ -7,7 +7,7 @@ from tvDatafeed import TvDatafeed, Interval
 # --- UNIFIED SYSTEM INITIALIZATION ---
 st.set_page_config(page_title="HRF QUANT PLATFORM", layout="wide")
 
-# Inject customized dark high-contrast mobile wrapper theme
+# Inject deep dark-mode styling variables for mobile UI clarity
 st.markdown("""
     <style>
     .reportview-container { background: #0d0d11; }
@@ -24,7 +24,7 @@ st.caption("Unified Quantitative Ecosystem — Model By HRF")
 st.divider()
 
 # --- DUAL-ENGINE NAVIGATION ---
-app_mode = st.sidebar.selectbox("🚀 Choose Analysis Core Engine", ["Structural Capitulation Wave", "Algorithmic Fractal Scan"])
+app_mode = st.sidebar.selectbox("🚀 Choose Analysis Core Engine", ["Algorithmic Fractal Scan", "Structural Capitulation Wave"])
 
 # Global Setup Configurations
 ticker_map = {
@@ -57,9 +57,202 @@ def get_election_regime(year):
     else: return 'Pre-Election'
 
 # ==============================================================================
-# ENGINE MODULE 1: CAPITULATION & DAYS SINCE RESET ENGINE
+# ENGINE MODULE 1: ALGORITHMIC FRACTAL GRID SCANNER (YOUR EXACT COLAB CORE)
 # ==============================================================================
-if app_mode == "Structural Capitulation Wave":
+if app_mode == "Algorithmic Fractal Scan":
+    st.header("🎯 Algorithmic Fractal & Structural Sandbox Grid")
+    
+    # User Input Panel Maps (Your exact options from Colab)
+    t_asset = st.sidebar.selectbox("Baseline Target Asset", list(ticker_map.keys()), index=0)
+    s_pool = st.sidebar.selectbox("Scan Matching Pool Range", ["All Assets"] + list(ticker_map.keys()), index=0)
+    i_choice = st.sidebar.selectbox("Sequence Time Frame Interval", ['1M', '1w', '1d', '1h', '15m', '5m'], index=2)
+    f_mode = st.sidebar.selectbox("Framework Processing Mode", ["Calculate Fractals", "Manual Compare"], index=0)
+    
+    start_d = st.sidebar.text_input("Analysis Target Window Start", value="latest")
+    end_d = st.sidebar.text_input("Analysis Target Window End", value="latest")
+    
+    ov_starts = st.sidebar.text_input("Manual Overlay Window Starts (Comma Separated)", value="2020-03-01, 2022-11-01")
+    ov_ends = st.sidebar.text_input("Manual Overlay Window Ends (Comma Separated)", value="2020-05-01, 2023-01-01")
+    
+    t_bars = st.sidebar.text_input("Scanning Sequence Width (Bars)", value="30")
+    f_bars = st.sidebar.text_input("Forward Projection Target (Bars)", value="15")
+    n_fractals = st.sidebar.text_input("Maximum Displayed Fractals", value="5")
+    iso_path = st.sidebar.text_input("Focus Highlight Mode Target (Number/All/Mean)", value="all")
+    
+    c_filter = st.sidebar.selectbox("US Cycle Macro Regime Filter", ['All Cycles', 'Election Year', 'Post-Election', 'Midterm Year', 'Pre-Election'], index=0)
+    spec_years = st.sidebar.text_input("Restrict Matching to Specific Calendar Years", value="all")
+    g_bars = st.sidebar.text_input("Temporal Separation Buffer Width (Bars)", value="20")
+    v_boost = st.sidebar.text_input("Amplitude Volatility Boost Multiplier (%)", value="0")
+    s_bands = st.sidebar.text_input("Standard Deviation Pipeline Bands (+/-)", value="1.0")
+
+    try:
+        target_bars_num = int(t_bars)
+        forecast_bars_num = int(f_bars)
+        num_fractals_num = int(n_fractals)
+        gap_bars_num = int(g_bars)
+        vol_boost_pct = float(v_boost)
+        std_dev_multiplier = float(s_bands)
+    except ValueError:
+        st.error("⚠️ Input Parse Warning: Confirm all dynamic slider inputs contain clean numeric integers.")
+        st.stop()
+
+    interval_map = {'1m': Interval.in_1_minute, '5m': Interval.in_5_minute, '15m': Interval.in_15_minute, '1h': Interval.in_1_hour, '1d': Interval.in_daily, '1w': Interval.in_weekly, '1M': Interval.in_monthly}
+    chosen_interval = interval_map.get(i_choice.lower(), Interval.in_daily)
+    max_bars = 16000 if i_choice in ['1d', '1w', '1M'] else 4900
+
+    tv = TvDatafeed()
+    sym, exch = ticker_map[t_asset]
+    
+    try:
+        df_target = tv.get_hist(symbol=sym, exchange=exch, interval=chosen_interval, n_bars=max_bars)
+        df_target.index = pd.to_datetime(df_target.index).tz_localize(None)
+        close_target = df_target['close'].dropna()
+        
+        start_clean = start_d.strip().lower()
+        end_clean = end_d.strip().lower()
+        
+        if start_clean == 'latest' or end_clean == 'latest':
+            target_df = close_target.iloc[-target_bars_num:]
+        else:
+            target_df = close_target.loc[pd.to_datetime(start_clean):pd.to_datetime(end_clean)]
+            target_bars_num = len(target_df)
+            
+        if len(target_df) == 0:
+            st.error("Selected timeline coordinates do not contain market bar metrics.")
+            st.stop()
+            
+        target_scaled = percentage_return_scale(target_df.tolist())
+        
+        plt.style.use('dark_background')
+        fig_frac = plt.figure(figsize=(16, 9))
+        plt.plot(target_scaled, color='#00ffcc', linewidth=4, label=f'TARGET: {t_asset} (Baseline)', zorder=5)
+        
+        # --- MANUAL COMPARE MODE ---
+        if f_mode == "Manual Compare":
+            starts = [s.strip() for s in ov_starts.split(',') if s.strip()]
+            ends = [e.strip() for e in ov_ends.split(',') if e.strip()]
+            manual_paths_list = []
+            
+            for idx, (st_val, ed_val) in enumerate(zip(starts, ends)):
+                try:
+                    ov_df = close_target.loc[pd.to_datetime(st_val):pd.to_datetime(ed_val)]
+                    if len(ov_df) == 0: continue
+                    ov_scaled = percentage_return_scale(ov_df.tolist())
+                    manual_paths_list.append(ov_scaled)
+                    
+                    isolate_clean = iso_path.strip().lower()
+                    if isolate_clean == 'all' or (isolate_clean.isdigit() and int(isolate_clean) == idx + 1):
+                        plt.plot(ov_scaled, linewidth=2, linestyle='--', alpha=0.6, label=f'Manual #{idx+1} [{st_val}]')
+                except:
+                    pass
+            
+            if manual_paths_list and iso_path.strip().lower() in ['all', 'mean']:
+                max_len = max(len(p) for p in manual_paths_list)
+                padded_list = [np.pad(p, (0, max_len - len(p)), 'edge') if len(p) < max_len else p for p in manual_paths_list]
+                manual_matrix = np.vstack(padded_list)
+                m_mean = np.mean(manual_matrix, axis=0) * (1.0 + (vol_boost_pct / 100.0))
+                m_std = np.std(manual_matrix, axis=0) * (1.0 + (vol_boost_pct / 100.0))
+                
+                if std_dev_multiplier > 0:
+                    plt.fill_between(range(len(m_mean)), m_mean - (m_std * std_dev_multiplier), m_mean + (m_std * std_dev_multiplier), color='#ffff00', alpha=0.12)
+                plt.plot(m_mean, color='#ffff00', linewidth=4, label='MANUAL COMPOSITE MEAN TRACK', zorder=6)
+
+        # --- CALCULATE FRACTALS MODE ---
+        else:
+            assets_to_scan = list(ticker_map.keys()) if s_pool == "All Assets" else [s_pool]
+            all_discovered_results = []
+            
+            for asset_item in assets_to_scan:
+                s_sym, s_exch = ticker_map[asset_item]
+                try:
+                    df_scan = tv.get_hist(symbol=s_sym, exchange=s_exch, interval=chosen_interval, n_bars=max_bars)
+                    if df_scan is None or df_scan.empty: continue
+                    df_scan.index = pd.to_datetime(df_scan.index).tz_localize(None)
+                    close_scan = df_scan['close'].dropna()
+                except:
+                    continue
+                
+                if asset_item == t_asset and (start_clean == 'latest' or end_clean == 'latest'):
+                    history_pool = close_scan.iloc[:-target_bars_num].tolist()
+                    history_dates = close_scan.index[:-target_bars_num]
+                else:
+                    history_pool = close_scan.tolist()
+                    history_dates = close_scan.index
+                    
+                max_search_index = len(history_pool) - (target_bars_num + forecast_bars_num)
+                if max_search_index <= 0: continue
+                
+                parsed_years = [int(y.strip()) for y in spec_years.split(',') if y.strip() and y.lower() != 'all']
+                
+                for i in range(max_search_index):
+                    hist_year = history_dates[i].year
+                    if hist_year == 2026: continue  # Path-dependent fix: Exclude 2026 from mean calculation
+                    hist_regime = get_election_regime(hist_year)
+                    
+                    if c_filter != 'All Cycles' and hist_regime != c_filter: continue
+                    if parsed_years and hist_year not in parsed_years: continue
+                    
+                    hist_pattern = history_pool[i : i + target_bars_num]
+                    hist_scaled = percentage_return_scale(hist_pattern)
+                    
+                    mse = float(np.mean((target_scaled - hist_scaled) ** 2))
+                    corr = float(np.corrcoef(target_scaled, hist_scaled)[0, 1])
+                    
+                    all_discovered_results.append({
+                        'asset_name': asset_item, 'start_index': i, 'end_index': i + target_bars_num,
+                        'mse': mse, 'correlation': corr, 'year': hist_year,
+                        'raw_prices': history_pool[i : i + target_bars_num + forecast_bars_num],
+                        'date_str': history_dates[i].strftime('%Y-%m-%d')
+                    })
+            
+            if all_discovered_results:
+                match_df = pd.DataFrame(all_discovered_results).sort_values(by='mse', ascending=True)
+                unique_matches, seen_clusters = [], set()
+                for _, row in match_df.iterrows():
+                    s, e, a = row['start_index'], row['end_index'], row['asset_name']
+                    if not any(max(s, es - gap_bars_num) < min(e, ee + gap_bars_num) for es, ee, aa in seen_clusters if aa == a):
+                        unique_matches.append(row)
+                        seen_clusters.add((s, e, a))
+                    if len(unique_matches) >= num_fractals_num: break
+                
+                all_scaled_paths_list = []
+                for row in unique_matches:
+                    raw_full = row['raw_prices']
+                    base_p = raw_full[0]
+                    scaled_full = ((np.array(raw_full) - base_p) / base_p) * 100.0 if base_p != 0 else np.zeros_like(raw_full)
+                    all_scaled_paths_list.append(scaled_full)
+                    
+                mean_path_array = np.mean(np.vstack(all_scaled_paths_list), axis=0) * (1.0 + (vol_boost_pct / 100.0)) if all_scaled_paths_list else None
+                
+                isolate_clean = iso_path.strip().lower()
+                if isolate_clean != 'mean':
+                    for idx, row in enumerate(unique_matches):
+                        if isolate_clean.isdigit() and int(isolate_clean) != idx + 1: continue
+                        raw_full = row['raw_prices']
+                        scaled_full = ((np.array(raw_full) - raw_full[0]) / raw_full[0]) * 100.0
+                        plt.plot(scaled_full, linestyle='--', alpha=0.5, label=f"#{idx+1} {row['asset_name']} ({row['date_str']})")
+                
+                if mean_path_array is not None and isolate_clean in ['all', 'mean']:
+                    if std_dev_multiplier > 0:
+                        std_path = np.std(np.vstack(all_scaled_paths_list), axis=0) * (1.0 + (vol_boost_pct / 100.0))
+                        plt.fill_between(range(len(mean_path_array)), mean_path_array - (std_path * std_dev_multiplier), mean_path_array + (std_path * std_dev_multiplier), color='#ffff00', alpha=0.1)
+                    plt.plot(mean_path_array, color='#ffff00', linewidth=4, label='COMPOSITE FRACTAL MEAN (Excluding 2026)', zorder=6)
+                plt.axvline(x=target_bars_num - 1, color='#ffffff', linestyle=':', alpha=0.5)
+
+        plt.axhline(y=0.0, color='#555555', linestyle='-', linewidth=1.2)
+        plt.title("HRF MATRIX ENGINE — UNIFIED MULTI-ASSET CORE CANVAS", color='#ffffff', fontsize=12, fontweight='bold')
+        plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:+.1f}%'))
+        plt.legend(loc='upper left', facecolor='#111111', edgecolor='#333333')
+        plt.tight_layout()
+        st.pyplot(fig_frac)
+
+    except Exception as e:
+        st.error(f"Ecosystem loading block halted: {e}")
+
+# ==============================================================================
+# ENGINE MODULE 2: CAPITULATION & DAYS SINCE RESET ENGINE
+# ==============================================================================
+else:
     st.header("⏱️ Path-Dependent Peak-To-Trough Reset Wave")
     
     vol_input = st.sidebar.text_input("Volatility Reset Threshold (%)", value="-40.0")
@@ -170,199 +363,5 @@ if app_mode == "Structural Capitulation Wave":
     except Exception as ex:
         st.error(f"Execution Error: {ex}")
 
-# ==============================================================================
-# ENGINE MODULE 2: ALGORITHMIC FRACTAL GRID SCANNER
-# ==============================================================================
-else:
-    st.header("🎯 Algorithmic Fractal & Structural Sandbox Grid")
-    
-    # User Input Panel Maps
-    t_asset = st.sidebar.selectbox("Baseline Target Asset", list(ticker_map.keys()), index=0)
-    s_pool = st.sidebar.selectbox("Scan Matching Pool Range", ["All Assets"] + list(ticker_map.keys()), index=0)
-    i_choice = st.sidebar.selectbox("Sequence Time Frame Interval", ['1M', '1w', '1d', '1h', '15m', '5m'], index=2)
-    f_mode = st.sidebar.selectbox("Framework Processing Mode", ["Calculate Fractals", "Manual Compare"], index=0)
-    
-    start_d = st.sidebar.text_input("Analysis Target Window Start", value="latest")
-    end_d = st.sidebar.text_input("Analysis Target Window End", value="latest")
-    
-    ov_starts = st.sidebar.text_input("Manual Overlay Window Starts (Comma Separated)", value="2020-03-01, 2022-11-01")
-    ov_ends = st.sidebar.text_input("Manual Overlay Window Ends (Comma Separated)", value="2020-05-01, 2023-01-01")
-    
-    t_bars = st.sidebar.text_input("Scanning Sequence Width (Bars)", value="30")
-    f_bars = st.sidebar.text_input("Forward Projection Target (Bars)", value="15")
-    n_fractals = st.sidebar.text_input("Maximum Displayed Fractals", value="5")
-    iso_path = st.sidebar.text_input("Focus Highlight Mode Target (Number/All/Mean)", value="all")
-    
-    c_filter = st.sidebar.selectbox("US Cycle Macro Regime Filter", ['All Cycles', 'Election Year', 'Post-Election', 'Midterm Year', 'Pre-Election'], index=0)
-    spec_years = st.sidebar.text_input("Restrict Matching to Specific Calendar Years", value="all")
-    g_bars = st.sidebar.text_input("Temporal Separation Buffer Width (Bars)", value="20")
-    v_boost = st.sidebar.text_input("Amplitude Volatility Boost Multiplier (%)", value="0")
-    s_bands = st.sidebar.text_input("Standard Deviation Pipeline Bands (+/-)", value="1.0")
-
-    # Parsing Inputs
-    try:
-        target_bars_num = int(t_bars)
-        forecast_bars_num = int(f_bars)
-        num_fractals_num = int(n_fractals)
-        gap_bars_num = int(g_bars)
-        vol_boost_pct = float(v_boost)
-        std_dev_multiplier = float(s_bands)
-    except ValueError:
-        st.error("⚠️ Input Parse Warning: Confirm all dynamic slider inputs contain clean numeric integers.")
-        st.stop()
-
-    interval_map = {'1m': Interval.in_1_minute, '5m': Interval.in_5_minute, '15m': Interval.in_15_minute, '1h': Interval.in_1_hour, '1d': Interval.in_daily, '1w': Interval.in_weekly, '1M': Interval.in_monthly}
-    chosen_interval = interval_map.get(i_choice.lower(), Interval.in_daily)
-    max_bars = 16000 if i_choice in ['1d', '1w', '1M'] else 4900
-
-    tv = TvDatafeed()
-    sym, exch = ticker_map[t_asset]
-    
-    try:
-        df_target = tv.get_hist(symbol=sym, exchange=exch, interval=chosen_interval, n_bars=max_bars)
-        df_target.index = pd.to_datetime(df_target.index).tz_localize(None)
-        close_target = df_target['close'].dropna()
-        
-        start_clean = start_d.strip().lower()
-        end_clean = end_d.strip().lower()
-        
-        if start_clean == 'latest' or end_clean == 'latest':
-            target_df = close_target.iloc[-target_bars_num:]
-        else:
-            target_df = close_target.loc[pd.to_datetime(start_clean):pd.to_datetime(end_clean)]
-            target_bars_num = len(target_df)
-            
-        if len(target_df) == 0:
-            st.error("Selected timeline coordinates do not contain market bar metrics.")
-            st.stop()
-            
-        target_scaled = percentage_return_scale(target_df.tolist())
-        
-        plt.style.use('dark_background')
-        fig_frac = plt.figure(figsize=(16, 9))
-        plt.plot(target_scaled, color='#00ffcc', linewidth=4, label=f'TARGET: {t_asset} (Baseline)', zorder=5)
-        
-        # MANUAL COMPILATION INTERFACE MODE
-        if f_mode == "Manual Compare":
-            starts = [s.strip() for s in ov_starts.split(',') if s.strip()]
-            ends = [e.strip() for e in ov_ends.split(',') if e.strip()]
-            manual_paths_list = []
-            
-            for idx, (st_val, ed_val) in enumerate(zip(starts, ends)):
-                try:
-                    ov_df = close_target.loc[pd.to_datetime(st_val):pd.to_datetime(ed_val)]
-                    if len(ov_df) == 0: continue
-                    ov_scaled = percentage_return_scale(ov_df.tolist())
-                    manual_paths_list.append(ov_scaled)
-                    
-                    isolate_clean = iso_path.strip().lower()
-                    if isolate_clean == 'all' or (isolate_clean.isdigit() and int(isolate_clean) == idx + 1):
-                        plt.plot(ov_scaled, linewidth=2, linestyle='--', alpha=0.6, label=f'Manual #{idx+1} [{st_val}]')
-                except:
-                    pass
-            
-            if manual_paths_list and iso_path.strip().lower() in ['all', 'mean']:
-                max_len = max(len(p) for p in manual_paths_list)
-                padded_list = [np.pad(p, (0, max_len - len(p)), 'edge') if len(p) < max_len else p for p in manual_paths_list]
-                manual_matrix = np.vstack(padded_list)
-                m_mean = np.mean(manual_matrix, axis=0) * (1.0 + (vol_boost_pct / 100.0))
-                m_std = np.std(manual_matrix, axis=0) * (1.0 + (vol_boost_pct / 100.0))
-                
-                if std_dev_multiplier > 0:
-                    plt.fill_between(range(len(m_mean)), m_mean - (m_std * std_dev_multiplier), m_mean + (m_std * std_dev_multiplier), color='#ffff00', alpha=0.12)
-                plt.plot(m_mean, color='#ffff00', linewidth=4, label='MANUAL COMPOSITE MEAN TRACK', zorder=6)
-
-        # ALGORITHMIC PATTERN SEARCH MODE
-        else:
-            assets_to_scan = list(ticker_map.keys()) if s_pool == "All Assets" else [s_pool]
-            all_discovered_results = []
-            
-            for asset_item in assets_to_scan:
-                s_sym, s_exch = ticker_map[asset_item]
-                try:
-                    df_scan = tv.get_hist(symbol=s_sym, exchange=s_exch, interval=chosen_interval, n_bars=max_bars)
-                    if df_scan is None or df_scan.empty: continue
-                    df_scan.index = pd.to_datetime(df_scan.index).tz_localize(None)
-                    close_scan = df_scan['close'].dropna()
-                except:
-                    continue
-                
-                if asset_item == t_asset and (start_clean == 'latest' or end_clean == 'latest'):
-                    history_pool = close_scan.iloc[:-target_bars_num].tolist()
-                    history_dates = close_scan.index[:-target_bars_num]
-                else:
-                    history_pool = close_scan.tolist()
-                    history_dates = close_scan.index
-                    
-                max_search_index = len(history_pool) - (target_bars_num + forecast_bars_num)
-                if max_search_index <= 0: continue
-                
-                parsed_years = [int(y.strip()) for y in spec_years.split(',') if y.strip() and y.lower() != 'all']
-                
-                for i in range(max_search_index):
-                    hist_year = history_dates[i].year
-                    if hist_year == 2026: continue  # Exclude current year YTD overlay from calculations
-                    hist_regime = get_election_regime(hist_year)
-                    
-                    if c_filter != 'All Cycles' and hist_regime != c_filter: continue
-                    if parsed_years and hist_year not in parsed_years: continue
-                    
-                    hist_pattern = history_pool[i : i + target_bars_num]
-                    hist_scaled = percentage_return_scale(hist_pattern)
-                    
-                    mse = float(np.mean((target_scaled - hist_scaled) ** 2))
-                    corr = float(np.corrcoef(target_scaled, hist_scaled)[0, 1])
-                    
-                    all_discovered_results.append({
-                        'asset_name': asset_item, 'start_index': i, 'end_index': i + target_bars_num,
-                        'mse': mse, 'correlation': corr, 'year': hist_year,
-                        'raw_prices': history_pool[i : i + target_bars_num + forecast_bars_num],
-                        'date_str': history_dates[i].strftime('%Y-%m-%d')
-                    })
-            
-            if all_discovered_results:
-                match_df = pd.DataFrame(all_discovered_results).sort_values(by='mse', ascending=True)
-                unique_matches, seen_clusters = [], set()
-                for _, row in match_df.iterrows():
-                    s, e, a = row['start_index'], row['end_index'], row['asset_name']
-                    if not any(max(s, es - gap_bars_num) < min(e, ee + gap_bars_num) for es, ee, aa in seen_clusters if aa == a):
-                        unique_matches.append(row)
-                        seen_clusters.add((s, e, a))
-                    if len(unique_matches) >= num_fractals_num: break
-                
-                all_scaled_paths_list = []
-                for row in unique_matches:
-                    raw_full = row['raw_prices']
-                    base_p = raw_full[0]
-                    scaled_full = ((np.array(raw_full) - base_p) / base_p) * 100.0 if base_p != 0 else np.zeros_like(raw_full)
-                    all_scaled_paths_list.append(scaled_full)
-                    
-                mean_path_array = np.mean(np.vstack(all_scaled_paths_list), axis=0) * (1.0 + (vol_boost_pct / 100.0)) if all_scaled_paths_list else None
-                
-                isolate_clean = iso_path.strip().lower()
-                if isolate_clean != 'mean':
-                    for idx, row in enumerate(unique_matches):
-                        if isolate_clean.isdigit() and int(isolate_clean) != idx + 1: continue
-                        raw_full = row['raw_prices']
-                        scaled_full = ((np.array(raw_full) - raw_full[0]) / raw_full[0]) * 100.0
-                        plt.plot(scaled_full, linestyle='--', alpha=0.5, label=f"#{idx+1} {row['asset_name']} ({row['date_str']})")
-                
-                if mean_path_array is not None and isolate_clean in ['all', 'mean']:
-                    if std_dev_multiplier > 0:
-                        std_path = np.std(np.vstack(all_scaled_paths_list), axis=0) * (1.0 + (vol_boost_pct / 100.0))
-                        plt.fill_between(range(len(mean_path_array)), mean_path_array - (std_path * std_dev_multiplier), mean_path_array + (std_path * std_dev_multiplier), color='#ffff00', alpha=0.1)
-                    plt.plot(mean_path_array, color='#ffff00', linewidth=4, label='COMPOSITE FRACTAL MEAN (Excluding 2026)', zorder=6)
-                plt.axvline(x=target_bars_num - 1, color='#ffffff', linestyle=':', alpha=0.5)
-
-        plt.axhline(y=0.0, color='#555555', linestyle='-', linewidth=1.2)
-        plt.title("HRF MATRIX ENGINE — UNIFIED MULTI-ASSET CORE CANVAS", color='#ffffff', fontsize=12, fontweight='bold')
-        plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:+.1f}%'))
-        plt.legend(loc='upper left', facecolor='#111111', edgecolor='#333333')
-        plt.tight_layout()
-        st.pyplot(fig_frac)
-
-    except Exception as e:
-        st.error(f"Ecosystem loading block halted: {e}")
-
-st.hr()
+st.divider()
 st.markdown("<p style='text-align: center; color: #555555;'>--- Model By HRF ---</p>", unsafe_allow_html=True)
