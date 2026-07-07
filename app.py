@@ -19,8 +19,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🏛️ HRF QUANT MASTER PLATFORM V2")
-st.caption("Unified Quantitative Ecosystem — Model By HRF")
+st.title("🏛️ HRF QUANT MASTER PLATFORM V2.1")
+st.caption("Unified Quantitative Ecosystem with Rolling Inter-Asset Correlation Matrices — Model By HRF")
 st.divider()
 
 # --- DUAL-ENGINE NAVIGATION ---
@@ -57,16 +57,22 @@ def get_election_regime(year):
     else: return 'Pre-Election'
 
 # ==============================================================================
-# ENGINE MODULE 1: ALGORITHMIC FRACTAL GRID SCANNER (YOUR EXACT COLAB CORE)
+# ENGINE MODULE 1: ALGORITHMIC FRACTAL GRID SCANNER + ROLLING CORRELATION PIPELINE
 # ==============================================================================
 if app_mode == "Algorithmic Fractal Scan":
-    st.header("🎯 Algorithmic Fractal & Structural Sandbox Grid")
+    st.header("🎯 Algorithmic Fractal, Structural Sandbox & Correlation Grid")
     
-    # User Input Panel Maps (Your exact options from Colab)
+    # User Input Panel Maps
     t_asset = st.sidebar.selectbox("Baseline Target Asset", list(ticker_map.keys()), index=0)
     s_pool = st.sidebar.selectbox("Scan Matching Pool Range", ["All Assets"] + list(ticker_map.keys()), index=0)
     i_choice = st.sidebar.selectbox("Sequence Time Frame Interval", ['1M', '1w', '1d', '1h', '15m', '5m'], index=2)
     f_mode = st.sidebar.selectbox("Framework Processing Mode", ["Calculate Fractals", "Manual Compare"], index=0)
+    
+    # --- NEW INTER-ASSET ROLLING CORRELATION OVERLAY CONTROLS ---
+    st.sidebar.markdown("### 📊 Inter-Asset Correlation Layer")
+    enable_corr = st.sidebar.checkbox("Overlay Rolling Macro Asset Correlation", value=False)
+    corr_asset = st.sidebar.selectbox("Correlation Comparison Asset", list(ticker_map.keys()), index=2)
+    corr_window = st.sidebar.text_input("Correlation Lookback Window (Bars)", value="14")
     
     start_d = st.sidebar.text_input("Analysis Target Window Start", value="latest")
     end_d = st.sidebar.text_input("Analysis Target Window End", value="latest")
@@ -92,6 +98,7 @@ if app_mode == "Algorithmic Fractal Scan":
         gap_bars_num = int(g_bars)
         vol_boost_pct = float(v_boost)
         std_dev_multiplier = float(s_bands)
+        c_win = int(corr_window)
     except ValueError:
         st.error("⚠️ Input Parse Warning: Confirm all dynamic slider inputs contain clean numeric integers.")
         st.stop()
@@ -123,9 +130,15 @@ if app_mode == "Algorithmic Fractal Scan":
             
         target_scaled = percentage_return_scale(target_df.tolist())
         
+        # Determine canvas structure depending on whether rolling correlation display panel is switched on
         plt.style.use('dark_background')
-        fig_frac = plt.figure(figsize=(16, 9))
-        plt.plot(target_scaled, color='#00ffcc', linewidth=4, label=f'TARGET: {t_asset} (Baseline)', zorder=5)
+        if enable_corr:
+            fig_frac, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 11), sharex=False, gridspec_kw={'height_ratios': [2.5, 1]})
+        else:
+            fig_frac, ax1 = plt.subplots(1, 1, figsize=(16, 8))
+            ax2 = None
+            
+        ax1.plot(target_scaled, color='#00ffcc', linewidth=4, label=f'TARGET: {t_asset} (Baseline)', zorder=5)
         
         # --- MANUAL COMPARE MODE ---
         if f_mode == "Manual Compare":
@@ -142,7 +155,7 @@ if app_mode == "Algorithmic Fractal Scan":
                     
                     isolate_clean = iso_path.strip().lower()
                     if isolate_clean == 'all' or (isolate_clean.isdigit() and int(isolate_clean) == idx + 1):
-                        plt.plot(ov_scaled, linewidth=2, linestyle='--', alpha=0.6, label=f'Manual #{idx+1} [{st_val}]')
+                        ax1.plot(ov_scaled, linewidth=2, linestyle='--', alpha=0.6, label=f'Manual #{idx+1} [{st_val}]')
                 except:
                     pass
             
@@ -154,8 +167,8 @@ if app_mode == "Algorithmic Fractal Scan":
                 m_std = np.std(manual_matrix, axis=0) * (1.0 + (vol_boost_pct / 100.0))
                 
                 if std_dev_multiplier > 0:
-                    plt.fill_between(range(len(m_mean)), m_mean - (m_std * std_dev_multiplier), m_mean + (m_std * std_dev_multiplier), color='#ffff00', alpha=0.12)
-                plt.plot(m_mean, color='#ffff00', linewidth=4, label='MANUAL COMPOSITE MEAN TRACK', zorder=6)
+                    ax1.fill_between(range(len(m_mean)), m_mean - (m_std * std_dev_multiplier), m_mean + (m_std * std_dev_multiplier), color='#ffff00', alpha=0.12)
+                ax1.plot(m_mean, color='#ffff00', linewidth=4, label='MANUAL COMPOSITE MEAN TRACK', zorder=6)
 
         # --- CALCULATE FRACTALS MODE ---
         else:
@@ -230,19 +243,59 @@ if app_mode == "Algorithmic Fractal Scan":
                         if isolate_clean.isdigit() and int(isolate_clean) != idx + 1: continue
                         raw_full = row['raw_prices']
                         scaled_full = ((np.array(raw_full) - raw_full[0]) / raw_full[0]) * 100.0
-                        plt.plot(scaled_full, linestyle='--', alpha=0.5, label=f"#{idx+1} {row['asset_name']} ({row['date_str']})")
+                        ax1.plot(scaled_full, linestyle='--', alpha=0.5, label=f"#{idx+1} {row['asset_name']} ({row['date_str']})")
                 
                 if mean_path_array is not None and isolate_clean in ['all', 'mean']:
                     if std_dev_multiplier > 0:
                         std_path = np.std(np.vstack(all_scaled_paths_list), axis=0) * (1.0 + (vol_boost_pct / 100.0))
-                        plt.fill_between(range(len(mean_path_array)), mean_path_array - (std_path * std_dev_multiplier), mean_path_array + (std_path * std_dev_multiplier), color='#ffff00', alpha=0.1)
-                    plt.plot(mean_path_array, color='#ffff00', linewidth=4, label='COMPOSITE FRACTAL MEAN (Excluding 2026)', zorder=6)
-                plt.axvline(x=target_bars_num - 1, color='#ffffff', linestyle=':', alpha=0.5)
+                        ax1.fill_between(range(len(mean_path_array)), mean_path_array - (std_path * std_dev_multiplier), mean_path_array + (std_path * std_dev_multiplier), color='#ffff00', alpha=0.1)
+                    ax1.plot(mean_path_array, color='#ffff00', linewidth=4, label='COMPOSITE FRACTAL MEAN (Excluding 2026)', zorder=6)
+                ax1.axvline(x=target_bars_num - 1, color='#ffffff', linestyle=':', alpha=0.5)
 
-        plt.axhline(y=0.0, color='#555555', linestyle='-', linewidth=1.2)
-        plt.title("HRF MATRIX ENGINE — UNIFIED MULTI-ASSET CORE CANVAS", color='#ffffff', fontsize=12, fontweight='bold')
-        plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:+.1f}%'))
-        plt.legend(loc='upper left', facecolor='#111111', edgecolor='#333333')
+        ax1.axhline(y=0.0, color='#555555', linestyle='-', linewidth=1.2)
+        ax1.set_title("HRF MATRIX ENGINE — UNIFIED MULTI-ASSET CORE CANVAS", color='#ffffff', fontsize=12, fontweight='bold')
+        ax1.set_ylabel("Percentage Performance Shift (%)")
+        ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:+.1f}%'))
+        ax1.legend(loc='upper left', facecolor='#111111', edgecolor='#333333')
+        
+        # --- COMPUTE ROLLING INTER-ASSET CORRELATION OVERLAY WAVE ---
+        if enable_corr and ax2 is not None:
+            c_sym, c_exch = ticker_map[corr_asset]
+            df_corr_asset = tv.get_hist(symbol=c_sym, exchange=c_exch, interval=chosen_interval, n_bars=max_bars)
+            
+            if df_corr_asset is not None and not df_corr_asset.empty:
+                df_corr_asset.index = pd.to_datetime(df_corr_asset.index).tz_localize(None)
+                close_corr = df_corr_asset['close'].dropna()
+                
+                # Align timeframes using identical date bounds as target asset segment
+                target_prices = close_target.loc[target_df.index]
+                compare_prices = close_corr.loc[target_df.index]
+                
+                comb_df = pd.concat([target_prices.rename('T'), compare_prices.rename('C')], axis=1, join='inner')
+                comb_df['ret_T'] = comb_df['T'].pct_change()
+                comb_df['ret_C'] = comb_df['C'].pct_change()
+                
+                # Compute lookback vector array
+                rolling_r = comb_df['ret_T'].rolling(window=c_win).corr(comb_df['ret_C']).tolist()
+                
+                # Pad out data to align lengths with visualization array coordinates
+                if len(rolling_r) < len(target_scaled):
+                    rolling_r = [np.nan] * (len(target_scaled) - len(rolling_r)) + rolling_r
+                elif len(rolling_r) > len(target_scaled):
+                    rolling_r = rolling_r[-len(target_scaled):]
+                    
+                ax2.plot(rolling_r, color='#ffff00', linewidth=2.5, label=f"Rolling {c_win}-Bar Correlation Coefficient Matrix ({t_asset} vs {corr_asset})")
+                ax2.fill_between(range(len(rolling_r)), rolling_r, 0, where=(np.array(rolling_r) >= 0), color='#00ff88', alpha=0.15)
+                ax2.fill_between(range(len(rolling_r)), rolling_r, 0, where=(np.array(rolling_r) < 0), color='#ff0055', alpha=0.15)
+                
+                ax2.axhline(0.0, color='#ffffff', linestyle='-', linewidth=0.8, alpha=0.5)
+                ax2.axhline(0.7, color='#00ff88', linestyle=':', alpha=0.8, label="High Correlation (> 0.7)")
+                ax2.axhline(-0.7, color='#ff0055', linestyle=':', alpha=0.8, label="Inverse Separation (< -0.7)")
+                ax2.set_ylim(-1.05, 1.05)
+                ax2.set_ylabel("Correlation R-Scale")
+                ax2.grid(True, color='#222222')
+                ax2.legend(loc='lower left', facecolor='#111111', fontsize=9)
+        
         plt.tight_layout()
         st.pyplot(fig_frac)
 
@@ -250,7 +303,7 @@ if app_mode == "Algorithmic Fractal Scan":
         st.error(f"Ecosystem loading block halted: {e}")
 
 # ==============================================================================
-# ENGINE MODULE 2: CAPITULATION & DAYS SINCE RESET ENGINE
+# ENGINE MODULE 2: CAPITULATION & DAYS SINCE RESET ENGINE (UNCHANGED)
 # ==============================================================================
 else:
     st.header("⏱️ Path-Dependent Peak-To-Trough Reset Wave")
@@ -314,15 +367,12 @@ else:
         
         current_live_gap = days_since_tracker[-1]
         
-        # N-Gram Logic
         clean_pattern = pattern_input.strip().upper()
         candle_string_sequence = "".join(['G' if r >= 0 else 'R' for r in df_daily['return'].tolist()])
         match_indices = [i + len(clean_pattern) for i in range(len(candle_string_sequence) - len(clean_pattern)) if candle_string_sequence[i : i + len(clean_pattern)] == clean_pattern]
         
         post_pattern_returns = [df_daily['return'].iloc[m] for m in match_indices if m < len(df_daily)]
-        forward_probability_green = (sum(1 for r in post_pattern_returns if r >= 0) / len(post_pattern_returns) * 100.0) if post_pattern_returns else 0.0
         
-        # Plot Canvas
         plt.style.use('dark_background')
         fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 10))
         
@@ -347,7 +397,6 @@ else:
         plt.tight_layout(pad=3.0)
         st.pyplot(fig)
         
-        # Display Tables
         st.subheader("📊 Performance Summary Matrix")
         metrics_data = {
             "Timeframe Segment": ["Daily Changes", "Weekly Changes", "Hourly Changes"],
