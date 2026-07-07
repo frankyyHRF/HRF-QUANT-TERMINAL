@@ -137,4 +137,4 @@ if app_mode == "Algorithmic Fractal Scan":
     
     t_bars = st.sidebar.text_input("Scanning Sequence Width (Bars)", value="30")
     f_bars = st.sidebar.text_input("Forward Projection Target (Bars)", value="15")
-    n_fractals = st.sidebar.text_input("Maximum Displayed Fractals
+    n_fractals = st.sidebar.text_input("Maximum Displayed Fractals", value="5")
