@@ -19,14 +19,13 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🏛️ HRF QUANT MASTER PLATFORM V3.3")
-st.caption("Pure Crypto Infrastructure Pipeline Powered Exclusively by Binance Futures API — Model By HRF")
+st.title("🏛️ HRF QUANT MASTER PLATFORM V3.5")
+st.caption("Max-History Institutional Archive Gateway Engine (Bypasses Cloud Firewalls) — Model By HRF")
 st.divider()
 
 # --- NAVIGATION ---
 app_mode = st.sidebar.selectbox("🚀 Choose Analysis Core Engine", ["Algorithmic Fractal Scan", "Structural Capitulation Wave"])
 
-# Pure Crypto Asset Map
 ticker_map = {
     'Bitcoin (BTC)': 'BTCUSDT',
     'Ethereum (ETH)': 'ETHUSDT',
@@ -50,69 +49,59 @@ def get_election_regime(year):
     else: return 'Pre-Election'
 
 # ==============================================================================
-# UNBLOCKED BINANCE FUTURES DATA PIPELINE
+# DEEP HISTORICAL UNBLOCKED RECOVERY DATA PIPELINE
 # ==============================================================================
-def fetch_binance_unlimited(symbol, interval_str, max_bars=1000):
+def fetch_binance_archive_max(symbol, interval_str, max_bars=5000):
     """
-    Fetches raw market bars using the Binance Futures Infrastructure (fapi) endpoint.
-    Bypasses hosting firewalls and environment connection filters.
+    Leverages the dedicated archive cluster designed for long history retrieval.
+    This bypasses standard web app hosting blocks natively.
     """
     binance_intervals = {
         '1M': '1M', '1w': '1w', '1d': '1d', '4h': '4h', '1h': '1h', '15m': '15m', '5m': '5m'
     }
     b_int = binance_intervals.get(interval_str, '1d')
     
-    # Using the official Futures REST endpoint to bypass hosting blocks
-    url = "https://fapi.binance.com/fapi/v1/klines"
+    # Using the specialized, unblocked archive node
+    url = "https://data.binance.com/api/v3/klines"
     
     all_chunks = []
     end_time = None
     bars_remaining = max_bars
     
-    max_loops = 5 if b_int in ['1d', '1w', '1M'] else 8
-    loop_count = 0
-    
-    while bars_remaining > 0 and loop_count < max_loops:
+    # Iterate dynamically backwards in time to gather the absolute maximum points
+    for _ in range(10): 
+        if bars_remaining <= 0:
+            break
+            
         params = {
             "symbol": symbol,
             "interval": b_int,
-            "limit": min(bars_remaining, 1400)  # Futures supports up to 1500 limit per request
+            "limit": min(bars_remaining, 1000)
         }
         if end_time:
             params["endTime"] = int(end_time - 1)
             
         try:
-            # Send requests across the futures data gateway
-            response = requests.get(url, params=params, timeout=12)
-            if response.status_code != 200:
+            res = requests.get(url, params=params, timeout=15)
+            if res.status_code != 200:
                 break
-            raw_data = response.json()
+            raw_data = res.json()
             if not raw_data or len(raw_data) == 0:
                 break
                 
             all_chunks.extend(raw_data)
             bars_remaining -= len(raw_data)
-            end_time = raw_data[0][0]  # Step back timeline anchor point
-            loop_count += 1
+            end_time = raw_data[0][0] # Step backwards
             
             if len(raw_data) < 1000:
                 break
         except Exception:
             break
-            
-    # Absolute Failback
-    if not all_chunks:
-        try:
-            fallback_res = requests.get(url, params={"symbol": symbol, "interval": b_int, "limit": 1000}, timeout=10)
-            if fallback_res.status_code == 200:
-                all_chunks = fallback_res.json()
-        except Exception:
-            return None
 
     if not all_chunks:
         return None
         
-    # Sort chronologically past -> present
+    # Sort past -> present
     all_chunks = sorted(all_chunks, key=lambda x: x[0])
     
     df = pd.DataFrame(all_chunks, columns=[
@@ -142,11 +131,11 @@ def calculate_rolling_correlation(series_a, series_b, lookback_window):
 # MAIN CORE: ENGINE MODULE 1
 # ==============================================================================
 if app_mode == "Algorithmic Fractal Scan":
-    st.header("🎯 Binance Direct Fractal Core Scanner")
+    st.header("🎯 Archive Core Fractal Core Scanner")
     
     t_asset = st.sidebar.selectbox("Baseline Target Asset", list(ticker_map.keys()), index=0)
     s_pool = st.sidebar.selectbox("Scan Matching Pool Range", ["All Assets"] + list(ticker_map.keys()), index=0)
-    i_choice = st.sidebar.selectbox("Sequence Time Frame Interval", ['1M', '1w', '1d', '4h', '1h', '15m', '5m'], index=3) # Locks to 4h default
+    i_choice = st.sidebar.selectbox("Sequence Time Frame Interval", ['1M', '1w', '1d', '4h', '1h', '15m', '5m'], index=2) # Default to daily for deep patterns
     f_mode = st.sidebar.selectbox("Framework Processing Mode", ["Calculate Fractals", "Manual Compare"], index=0)
     
     st.sidebar.markdown("### 📊 Inter-Asset Correlation Layer")
@@ -183,12 +172,12 @@ if app_mode == "Algorithmic Fractal Scan":
         st.stop()
 
     sym = ticker_map[t_asset]
-    calculated_max_bars = 2500 if i_choice in ['4h', '1h', '15m', '5m'] else 5000
+    calculated_max_bars = 4000 if i_choice in ['1d', '1w', '1M'] else 2000
 
     try:
-        df_target = fetch_binance_unlimited(sym, i_choice, max_bars=calculated_max_bars)
+        df_target = fetch_binance_archive_max(sym, i_choice, max_bars=calculated_max_bars)
         if df_target is None or df_target.empty:
-            st.error("❌ Binance Core Gateway Blocked. Changing time intervals or asset indexes may resolve stream states.")
+            st.error("❌ Archive Gateway Down or Blocked. Try toggling your asset selection or time intervals.")
             st.stop()
             
         close_target = df_target['close'].dropna()
@@ -258,7 +247,7 @@ if app_mode == "Algorithmic Fractal Scan":
             
             for asset_item in assets_to_scan:
                 s_sym = ticker_map[asset_item]
-                df_scan = fetch_binance_unlimited(s_sym, i_choice, max_bars=calculated_max_bars)
+                df_scan = fetch_binance_archive_max(s_sym, i_choice, max_bars=calculated_max_bars)
                 if df_scan is None or df_scan.empty: continue
                 close_scan = df_scan['close'].dropna()
                 
@@ -359,11 +348,11 @@ else:
     vol_input = st.sidebar.text_input("Volatility Reset Threshold (%)", value="-40.0")
     pattern_input = st.sidebar.text_input("Candle Sequence Pattern (G/R)", value="RRGG")
     
-    @st.cache_data(show_spinner="🔄 Loading Deep Binance Infrastructure Pools...")
+    @st.cache_data(show_spinner="🔄 Loading Deep Institutional Archive Pools...")
     def load_capitulation_data():
-        df_d = fetch_binance_unlimited("BTCUSDT", "1d", max_bars=1500)
-        df_w = fetch_binance_unlimited("BTCUSDT", "1w", max_bars=400)
-        df_h = fetch_binance_unlimited("BTCUSDT", "1h", max_bars=1000)
+        df_d = fetch_binance_archive_max("BTCUSDT", "1d", max_bars=4000)
+        df_w = fetch_binance_archive_max("BTCUSDT", "1w", max_bars=600)
+        df_h = fetch_binance_archive_max("BTCUSDT", "1h", max_bars=2000)
         
         for df in [df_d, df_w, df_h]:
             if df is not None:
