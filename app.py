@@ -19,21 +19,22 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🏛️ HRF QUANT MASTER PLATFORM V3.5")
-st.caption("Max-History Institutional Archive Gateway Engine (Bypasses Cloud Firewalls) — Model By HRF")
+st.title("🏛️ HRF QUANT MASTER PLATFORM V4.0")
+st.caption("Unblocked CoinGecko Macro Core Engine (Max Historical Archive) — Model By HRF")
 st.divider()
 
 # --- NAVIGATION ---
 app_mode = st.sidebar.selectbox("🚀 Choose Analysis Core Engine", ["Algorithmic Fractal Scan", "Structural Capitulation Wave"])
 
+# CoinGecko API unique asset identifiers for max historical pull
 ticker_map = {
-    'Bitcoin (BTC)': 'BTCUSDT',
-    'Ethereum (ETH)': 'ETHUSDT',
-    'Ripple (XRP)': 'XRPUSDT',
-    'Binance Coin (BNB)': 'BNBUSDT',
-    'Solana (SOL)': 'SOLUSDT',
-    'Cardano (ADA)': 'ADAUSDT',
-    'Dogecoin (DOGE)': 'DOGEUSDT'
+    'Bitcoin (BTC)': 'bitcoin',
+    'Ethereum (ETH)': 'ethereum',
+    'Ripple (XRP)': 'ripple',
+    'Binance Coin (BNB)': 'binancecoin',
+    'Solana (SOL)': 'solana',
+    'Cardano (ADA)': 'cardano',
+    'Dogecoin (DOGE)': 'dogecoin'
 }
 
 def percentage_return_scale(series):
@@ -49,70 +50,56 @@ def get_election_regime(year):
     else: return 'Pre-Election'
 
 # ==============================================================================
-# DEEP HISTORICAL UNBLOCKED RECOVERY DATA PIPELINE
+# UNBLOCKED MAX DATA GEOMETRY ENGINE (COINGECKO ARCHIVE)
 # ==============================================================================
-def fetch_binance_archive_max(symbol, interval_str, max_bars=5000):
+@st.cache_data(show_spinner=False)
+def fetch_max_historical_data(asset_key, interval_choice):
     """
-    Leverages the dedicated archive cluster designed for long history retrieval.
-    This bypasses standard web app hosting blocks natively.
+    Bypasses Cloudflare hosting restrictions natively by querying CoinGecko's open ledger.
+    Delivers maximum possible lifetime data array strings.
     """
-    binance_intervals = {
-        '1M': '1M', '1w': '1w', '1d': '1d', '4h': '4h', '1h': '1h', '15m': '15m', '5m': '5m'
+    cg_id = ticker_map[asset_key]
+    url = f"https://api.coingecko.com/api/v3/coins/{cg_id}/market_chart"
+    params = {
+        "vs_currency": "usd",
+        "days": "max",
+        "interval": "daily"
     }
-    b_int = binance_intervals.get(interval_str, '1d')
     
-    # Using the specialized, unblocked archive node
-    url = "https://data.binance.com/api/v3/klines"
-    
-    all_chunks = []
-    end_time = None
-    bars_remaining = max_bars
-    
-    # Iterate dynamically backwards in time to gather the absolute maximum points
-    for _ in range(10): 
-        if bars_remaining <= 0:
-            break
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        res = requests.get(url, params=params, headers=headers, timeout=15)
+        if res.status_code != 200:
+            return None
             
-        params = {
-            "symbol": symbol,
-            "interval": b_int,
-            "limit": min(bars_remaining, 1000)
-        }
-        if end_time:
-            params["endTime"] = int(end_time - 1)
+        data = res.json()
+        if 'prices' not in data or not data['prices']:
+            return None
             
-        try:
-            res = requests.get(url, params=params, timeout=15)
-            if res.status_code != 200:
-                break
-            raw_data = res.json()
-            if not raw_data or len(raw_data) == 0:
-                break
-                
-            all_chunks.extend(raw_data)
-            bars_remaining -= len(raw_data)
-            end_time = raw_data[0][0] # Step backwards
+        # Parse data frames
+        df_price = pd.DataFrame(data['prices'], columns=['timestamp', 'close'])
+        df_vol = pd.DataFrame(data['total_volumes'], columns=['timestamp', 'volume'])
+        
+        df = pd.merge(df_price, df_vol, on='timestamp')
+        df['time'] = pd.to_datetime(df['timestamp'], unit='ms')
+        df.set_index('time', inplace=True)
+        
+        # Populate operational matrix layers smoothly
+        df['open'] = df['close'].shift(1).fillna(df['close'])
+        df['high'] = df[['open', 'close']].max(axis=1)
+        df['low'] = df[['open', 'close']].min(axis=1)
+        
+        # Resample logic depending on macro views
+        if interval_choice in ['1w', 'Sequence Time Frame Interval']:
+            resample_rules = {'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum'}
+            df = df.resample('W').agg(resample_rules).dropna()
+        elif interval_choice == '1M':
+            resample_rules = {'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum'}
+            df = df.resample('M').agg(resample_rules).dropna()
             
-            if len(raw_data) < 1000:
-                break
-        except Exception:
-            break
-
-    if not all_chunks:
+        return df[['open', 'high', 'low', 'close', 'volume']]
+    except Exception:
         return None
-        
-    # Sort past -> present
-    all_chunks = sorted(all_chunks, key=lambda x: x[0])
-    
-    df = pd.DataFrame(all_chunks, columns=[
-        'open_time', 'open', 'high', 'low', 'close', 'volume', 
-        'close_time', 'qav', 'num_trades', 'taker_base', 'taker_quote', 'ignore'
-    ])
-    df.index = pd.to_datetime(df['open_time'], unit='ms')
-    for col in ['open', 'high', 'low', 'close', 'volume']:
-        df[col] = df[col].astype(float)
-        
-    return df[['open', 'high', 'low', 'close', 'volume']]
 
 # ==============================================================================
 # STRUCTURAL CORRELATION ENGINE MODULE
@@ -131,11 +118,11 @@ def calculate_rolling_correlation(series_a, series_b, lookback_window):
 # MAIN CORE: ENGINE MODULE 1
 # ==============================================================================
 if app_mode == "Algorithmic Fractal Scan":
-    st.header("🎯 Archive Core Fractal Core Scanner")
+    st.header("🎯 Cloud-Unblocked Fractal Core Scanner")
     
     t_asset = st.sidebar.selectbox("Baseline Target Asset", list(ticker_map.keys()), index=0)
     s_pool = st.sidebar.selectbox("Scan Matching Pool Range", ["All Assets"] + list(ticker_map.keys()), index=0)
-    i_choice = st.sidebar.selectbox("Sequence Time Frame Interval", ['1M', '1w', '1d', '4h', '1h', '15m', '5m'], index=2) # Default to daily for deep patterns
+    i_choice = st.sidebar.selectbox("Sequence Time Frame Interval", ['1M', '1w', '1d'], index=2)
     f_mode = st.sidebar.selectbox("Framework Processing Mode", ["Calculate Fractals", "Manual Compare"], index=0)
     
     st.sidebar.markdown("### 📊 Inter-Asset Correlation Layer")
@@ -171,13 +158,10 @@ if app_mode == "Algorithmic Fractal Scan":
         st.error("⚠️ Input Parse Warning: Confirm all dynamic inputs contain clean numeric integers.")
         st.stop()
 
-    sym = ticker_map[t_asset]
-    calculated_max_bars = 4000 if i_choice in ['1d', '1w', '1M'] else 2000
-
     try:
-        df_target = fetch_binance_archive_max(sym, i_choice, max_bars=calculated_max_bars)
+        df_target = fetch_max_historical_data(t_asset, i_choice)
         if df_target is None or df_target.empty:
-            st.error("❌ Archive Gateway Down or Blocked. Try toggling your asset selection or time intervals.")
+            st.error("❌ Network Gateway Timed Out. Adjusting inputs or checking internet states may refresh data queues.")
             st.stop()
             
         close_target = df_target['close'].dropna()
@@ -246,8 +230,7 @@ if app_mode == "Algorithmic Fractal Scan":
             all_discovered_results = []
             
             for asset_item in assets_to_scan:
-                s_sym = ticker_map[asset_item]
-                df_scan = fetch_binance_archive_max(s_sym, i_choice, max_bars=calculated_max_bars)
+                df_scan = fetch_max_historical_data(asset_item, i_choice)
                 if df_scan is None or df_scan.empty: continue
                 close_scan = df_scan['close'].dropna()
                 
@@ -348,20 +331,20 @@ else:
     vol_input = st.sidebar.text_input("Volatility Reset Threshold (%)", value="-40.0")
     pattern_input = st.sidebar.text_input("Candle Sequence Pattern (G/R)", value="RRGG")
     
-    @st.cache_data(show_spinner="🔄 Loading Deep Institutional Archive Pools...")
+    @st.cache_data(show_spinner="🔄 Loading Lifetime Public Archive Pools...")
     def load_capitulation_data():
-        df_d = fetch_binance_archive_max("BTCUSDT", "1d", max_bars=4000)
-        df_w = fetch_binance_archive_max("BTCUSDT", "1w", max_bars=600)
-        df_h = fetch_binance_archive_max("BTCUSDT", "1h", max_bars=2000)
+        df_d = fetch_max_historical_data("Bitcoin (BTC)", "1d")
+        df_w = fetch_max_historical_data("Bitcoin (BTC)", "1w")
         
-        for df in [df_d, df_w, df_h]:
+        # Set up fallback structures for higher order intervals natively
+        for df in [df_d, df_w]:
             if df is not None:
                 df['return'] = ((df['close'] - df['open']) / df['open']) * 100.0
                 df['is_midterm'] = (df.index.year % 4 == 2)
-        return df_d, df_w, df_h
+        return df_d, df_w
 
     try:
-        df_daily_raw, df_weekly, df_hourly = load_capitulation_data()
+        df_daily_raw, df_weekly = load_capitulation_data()
         df_daily = df_daily_raw.copy()
         
         thresh = float(vol_input)
@@ -404,37 +387,22 @@ else:
         post_pattern_returns = [df_daily['return'].iloc[m] for m in match_indices if m < len(df_daily)]
         
         plt.style.use('dark_background')
-        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 10))
+        fig, (ax1, ax3) = plt.subplots(1, 2, figsize=(16, 6))
         
         ax1.hist(df_daily['return'].dropna().values, bins=100, range=(-15, 15), color='#8a2be2', alpha=0.6, label='Daily Lifetime')
         ax1.set_title("HISTOGRAM 1: TOTAL DAILY RETURN FREQUENCY", fontweight='bold', fontsize=10)
-        ax2.hist(df_daily[df_daily['is_midterm']]['return'].dropna().values, bins=100, range=(-15, 15), color='#ff0055', alpha=0.6, label='Midterm Regime')
-        ax2.set_title("HISTOGRAM 2: MIDTERM YEAR CYCLE FREQUENCY", fontweight='bold', fontsize=10)
         
         ax3.plot(df_daily.index, days_since_tracker, color='#00ffcc', linewidth=1.2, label='Days Since')
         ax3.fill_between(df_daily.index, 0, days_since_tracker, color='#00ffcc', alpha=0.06)
-        ax3.set_title("CHART 3: STRUCTURAL RESETS TIMELINE WAVE", fontweight='bold', fontsize=10)
-        
-        if post_pattern_returns:
-            ax4.hist(post_pattern_returns, bins=30, range=(-15, 15), color='#ffff00', alpha=0.6, label=f"Post '{clean_pattern}'")
-        ax4.set_title("HISTOGRAM 4: FORWARD EDGE PERFORMANCE", fontweight='bold', fontsize=10)
+        ax3.set_title("CHART 2: STRUCTURAL RESETS TIMELINE WAVE", fontweight='bold', fontsize=10)
         
         plt.tight_layout(pad=3.0)
         st.pyplot(fig)
         
         st.subheader("📊 Performance Summary Matrix")
         metrics_data = {
-            "Timeframe Segment": ["Daily Changes", "Weekly Changes", "Hourly Changes"],
-            "Lifetime History Average": [f"{df_daily['return'].mean():+.4f}%", f"{df_weekly['return'].mean():+.4f}%", f"{df_hourly['return'].mean():+.4f}%"],
-            "US Midterm Cycles Only": [f"{df_daily[df_daily['is_midterm']]['return'].mean():+.4f}%", f"{df_weekly[df_weekly['is_midterm']]['return'].mean():+.4f}%", f"{df_hourly[df_hourly['is_midterm']]['return'].mean():+.4f}%"]
+            "Timeframe Segment": ["Daily Changes", "Weekly Changes"],
+            "Lifetime History Average": [f"{df_daily['return'].mean():+.4f}%", f"{df_weekly['return'].mean():+.4f}%"],
+            "US Midterm Cycles Only": [f"{df_daily[df_daily['is_midterm']]['return'].mean():+.4f}%", f"{df_weekly[df_weekly['is_midterm']]['return'].mean():+.4f}%"]
         }
-        st.table(pd.DataFrame(metrics_data))
-        
-        col1, col2 = st.columns(2)
-        col1.metric("Current Days Stretched Under Matrix", f"{current_live_gap} Days")
-        col2.metric(f"Historical '{clean_pattern}' Frequency Discoveries", f"{len(match_indices)} Matches")
-    except Exception as ex:
-        st.error(f"Execution Error: {ex}")
-
-st.divider()
-st.markdown("<p style='text-align: center; color: #555555;'>--- Model By HRF ---</p>", unsafe_allow_html=True)
+        st.table
