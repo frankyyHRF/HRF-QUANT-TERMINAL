@@ -57,22 +57,48 @@ def get_election_regime(year):
     else: return 'Pre-Election'
 
 # ==============================================================================
-# ENGINE MODULE 1: ALGORITHMIC FRACTAL GRID SCANNER + ROLLING CORRELATION PIPELINE
+# FIXED INTER-ASSET SEQUENTIAL CORRELATION MATH PIPELINE
+# ==============================================================================
+def calculate_rolling_correlation(series_a, series_b, lookback_window):
+    """
+    Computes a point-by-point rolling correlation based on chart index positions,
+    completely bypassing calendar date mismatch conflicts.
+    """
+    arr_a = np.array(series_a, dtype=float).flatten()
+    arr_b = np.array(series_b, dtype=float).flatten()
+    
+    min_len = min(len(arr_a), len(arr_b))
+    if min_len == 0:
+        return []
+        
+    arr_a = arr_a[:min_len]
+    arr_b = arr_b[:min_len]
+    
+    df = pd.DataFrame({
+        'Target_Curve': arr_a,
+        'Match_Curve': arr_b
+    })
+    
+    df['Ret_A'] = df['Target_Curve'].pct_change()
+    df['Ret_C'] = df['Match_Curve'].pct_change()
+    
+    df['Rolling_R'] = df['Ret_A'].rolling(window=int(lookback_window)).corr(df['Ret_C'])
+    return df['Rolling_R'].fillna(0.0).tolist()
+
+# ==============================================================================
+# ENGINE MODULE 1: ALGORITHMIC FRACTAL GRID SCANNER
 # ==============================================================================
 if app_mode == "Algorithmic Fractal Scan":
     st.header("🎯 Algorithmic Fractal, Structural Sandbox & Correlation Grid")
     
-    # User Input Panel Maps
     t_asset = st.sidebar.selectbox("Baseline Target Asset", list(ticker_map.keys()), index=0)
     s_pool = st.sidebar.selectbox("Scan Matching Pool Range", ["All Assets"] + list(ticker_map.keys()), index=0)
     i_choice = st.sidebar.selectbox("Sequence Time Frame Interval", ['1M', '1w', '1d', '1h', '15m', '5m'], index=2)
     f_mode = st.sidebar.selectbox("Framework Processing Mode", ["Calculate Fractals", "Manual Compare"], index=0)
     
-    # --- NEW INTER-ASSET ROLLING CORRELATION OVERLAY CONTROLS ---
     st.sidebar.markdown("### 📊 Inter-Asset Correlation Layer")
     enable_corr = st.sidebar.checkbox("Overlay Rolling Macro Asset Correlation", value=False)
-    corr_asset = st.sidebar.selectbox("Correlation Comparison Asset", list(ticker_map.keys()), index=2)
-    corr_window = st.sidebar.text_input("Correlation Lookback Window (Bars)", value="14")
+    corr_window = st.sidebar.text_input("Correlation Lookback Window (Bars)", value="10")
     
     start_d = st.sidebar.text_input("Analysis Target Window Start", value="latest")
     end_d = st.sidebar.text_input("Analysis Target Window End", value="latest")
@@ -100,7 +126,7 @@ if app_mode == "Algorithmic Fractal Scan":
         std_dev_multiplier = float(s_bands)
         c_win = int(corr_window)
     except ValueError:
-        st.error("⚠️ Input Parse Warning: Confirm all dynamic slider inputs contain clean numeric integers.")
+        st.error("⚠️ Input Parse Warning: Confirm all dynamic inputs contain clean numeric integers.")
         st.stop()
 
     interval_map = {'1m': Interval.in_1_minute, '5m': Interval.in_5_minute, '15m': Interval.in_15_minute, '1h': Interval.in_1_hour, '1d': Interval.in_daily, '1w': Interval.in_weekly, '1M': Interval.in_monthly}
@@ -130,10 +156,9 @@ if app_mode == "Algorithmic Fractal Scan":
             
         target_scaled = percentage_return_scale(target_df.tolist())
         
-        # Determine canvas structure depending on whether rolling correlation display panel is switched on
         plt.style.use('dark_background')
         if enable_corr:
-            fig_frac, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 11), sharex=False, gridspec_kw={'height_ratios': [2.5, 1]})
+            fig_frac, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 11), sharex=True, gridspec_kw={'height_ratios': [2.5, 1]})
         else:
             fig_frac, ax1 = plt.subplots(1, 1, figsize=(16, 8))
             ax2 = None
@@ -146,6 +171,7 @@ if app_mode == "Algorithmic Fractal Scan":
             ends = [e.strip() for e in ov_ends.split(',') if e.strip()]
             manual_paths_list = []
             
+            isolate_clean = iso_path.strip().lower()
             for idx, (st_val, ed_val) in enumerate(zip(starts, ends)):
                 try:
                     ov_df = close_target.loc[pd.to_datetime(st_val):pd.to_datetime(ed_val)]
@@ -153,13 +179,12 @@ if app_mode == "Algorithmic Fractal Scan":
                     ov_scaled = percentage_return_scale(ov_df.tolist())
                     manual_paths_list.append(ov_scaled)
                     
-                    isolate_clean = iso_path.strip().lower()
                     if isolate_clean == 'all' or (isolate_clean.isdigit() and int(isolate_clean) == idx + 1):
                         ax1.plot(ov_scaled, linewidth=2, linestyle='--', alpha=0.6, label=f'Manual #{idx+1} [{st_val}]')
                 except:
                     pass
             
-            if manual_paths_list and iso_path.strip().lower() in ['all', 'mean']:
+            if manual_paths_list and isolate_clean in ['all', 'mean']:
                 max_len = max(len(p) for p in manual_paths_list)
                 padded_list = [np.pad(p, (0, max_len - len(p)), 'edge') if len(p) < max_len else p for p in manual_paths_list]
                 manual_matrix = np.vstack(padded_list)
@@ -169,6 +194,13 @@ if app_mode == "Algorithmic Fractal Scan":
                 if std_dev_multiplier > 0:
                     ax1.fill_between(range(len(m_mean)), m_mean - (m_std * std_dev_multiplier), m_mean + (m_std * std_dev_multiplier), color='#ffff00', alpha=0.12)
                 ax1.plot(m_mean, color='#ffff00', linewidth=4, label='MANUAL COMPOSITE MEAN TRACK', zorder=6)
+
+                # Execute dynamic sequential correlation between Cyan curve and Yellow curve
+                if enable_corr and ax2 is not None:
+                    r_wave = calculate_rolling_correlation(target_scaled, m_mean, c_win)
+                    ax2.plot(r_wave, color='#ffff00', linewidth=2.5, label=f"Rolling {c_win}-Bar Correlation (Cyan vs Yellow Line)")
+                    ax2.fill_between(range(len(r_wave)), r_wave, 0, where=(np.array(r_wave) >= 0), color='#00ff88', alpha=0.15)
+                    ax2.fill_between(range(len(r_wave)), r_wave, 0, where=(np.array(r_wave) < 0), color='#ff0055', alpha=0.15)
 
         # --- CALCULATE FRACTALS MODE ---
         else:
@@ -199,7 +231,7 @@ if app_mode == "Algorithmic Fractal Scan":
                 
                 for i in range(max_search_index):
                     hist_year = history_dates[i].year
-                    if hist_year == 2026: continue  # Path-dependent fix: Exclude 2026 from mean calculation
+                    if hist_year == 2026: continue
                     hist_regime = get_election_regime(hist_year)
                     
                     if c_filter != 'All Cycles' and hist_regime != c_filter: continue
@@ -252,49 +284,27 @@ if app_mode == "Algorithmic Fractal Scan":
                     ax1.plot(mean_path_array, color='#ffff00', linewidth=4, label='COMPOSITE FRACTAL MEAN (Excluding 2026)', zorder=6)
                 ax1.axvline(x=target_bars_num - 1, color='#ffffff', linestyle=':', alpha=0.5)
 
+                # In calculation scan mode, correlate the Target Cyan line vs the Composite Mean Yellow line
+                if enable_corr and ax2 is not None and mean_path_array is not None:
+                    r_wave = calculate_rolling_correlation(target_scaled, mean_path_array, c_win)
+                    ax2.plot(r_wave, color='#ffff00', linewidth=2.5, label=f"Rolling {c_win}-Bar Correlation (Cyan vs Mean Fractal)")
+                    ax2.fill_between(range(len(r_wave)), r_wave, 0, where=(np.array(r_wave) >= 0), color='#00ff88', alpha=0.15)
+                    ax2.fill_between(range(len(r_wave)), r_wave, 0, where=(np.array(r_wave) < 0), color='#ff0055', alpha=0.15)
+
         ax1.axhline(y=0.0, color='#555555', linestyle='-', linewidth=1.2)
         ax1.set_title("HRF MATRIX ENGINE — UNIFIED MULTI-ASSET CORE CANVAS", color='#ffffff', fontsize=12, fontweight='bold')
         ax1.set_ylabel("Percentage Performance Shift (%)")
         ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:+.1f}%'))
         ax1.legend(loc='upper left', facecolor='#111111', edgecolor='#333333')
         
-        # --- COMPUTE ROLLING INTER-ASSET CORRELATION OVERLAY WAVE ---
         if enable_corr and ax2 is not None:
-            c_sym, c_exch = ticker_map[corr_asset]
-            df_corr_asset = tv.get_hist(symbol=c_sym, exchange=c_exch, interval=chosen_interval, n_bars=max_bars)
-            
-            if df_corr_asset is not None and not df_corr_asset.empty:
-                df_corr_asset.index = pd.to_datetime(df_corr_asset.index).tz_localize(None)
-                close_corr = df_corr_asset['close'].dropna()
-                
-                # Align timeframes using identical date bounds as target asset segment
-                target_prices = close_target.loc[target_df.index]
-                compare_prices = close_corr.loc[target_df.index]
-                
-                comb_df = pd.concat([target_prices.rename('T'), compare_prices.rename('C')], axis=1, join='inner')
-                comb_df['ret_T'] = comb_df['T'].pct_change()
-                comb_df['ret_C'] = comb_df['C'].pct_change()
-                
-                # Compute lookback vector array
-                rolling_r = comb_df['ret_T'].rolling(window=c_win).corr(comb_df['ret_C']).tolist()
-                
-                # Pad out data to align lengths with visualization array coordinates
-                if len(rolling_r) < len(target_scaled):
-                    rolling_r = [np.nan] * (len(target_scaled) - len(rolling_r)) + rolling_r
-                elif len(rolling_r) > len(target_scaled):
-                    rolling_r = rolling_r[-len(target_scaled):]
-                    
-                ax2.plot(rolling_r, color='#ffff00', linewidth=2.5, label=f"Rolling {c_win}-Bar Correlation Coefficient Matrix ({t_asset} vs {corr_asset})")
-                ax2.fill_between(range(len(rolling_r)), rolling_r, 0, where=(np.array(rolling_r) >= 0), color='#00ff88', alpha=0.15)
-                ax2.fill_between(range(len(rolling_r)), rolling_r, 0, where=(np.array(rolling_r) < 0), color='#ff0055', alpha=0.15)
-                
-                ax2.axhline(0.0, color='#ffffff', linestyle='-', linewidth=0.8, alpha=0.5)
-                ax2.axhline(0.7, color='#00ff88', linestyle=':', alpha=0.8, label="High Correlation (> 0.7)")
-                ax2.axhline(-0.7, color='#ff0055', linestyle=':', alpha=0.8, label="Inverse Separation (< -0.7)")
-                ax2.set_ylim(-1.05, 1.05)
-                ax2.set_ylabel("Correlation R-Scale")
-                ax2.grid(True, color='#222222')
-                ax2.legend(loc='lower left', facecolor='#111111', fontsize=9)
+            ax2.axhline(0.0, color='#ffffff', linestyle='-', linewidth=0.8, alpha=0.5)
+            ax2.axhline(0.7, color='#00ff88', linestyle=':', alpha=0.8, label="High Correlation (> 0.7)")
+            ax2.axhline(-0.7, color='#ff0055', linestyle=':', alpha=0.8, label="Inverse Separation (< -0.7)")
+            ax2.set_ylim(-1.05, 1.05)
+            ax2.set_ylabel("Correlation R-Scale")
+            ax2.grid(True, color='#222222')
+            ax2.legend(loc='lower left', facecolor='#111111', fontsize=9)
         
         plt.tight_layout()
         st.pyplot(fig_frac)
@@ -303,7 +313,7 @@ if app_mode == "Algorithmic Fractal Scan":
         st.error(f"Ecosystem loading block halted: {e}")
 
 # ==============================================================================
-# ENGINE MODULE 2: CAPITULATION & DAYS SINCE RESET ENGINE (UNCHANGED)
+# ENGINE MODULE 2: CAPITULATION & DAYS SINCE RESET ENGINE
 # ==============================================================================
 else:
     st.header("⏱️ Path-Dependent Peak-To-Trough Reset Wave")
@@ -414,3 +424,4 @@ else:
 
 st.divider()
 st.markdown("<p style='text-align: center; color: #555555;'>--- Model By HRF ---</p>", unsafe_allow_html=True)
+               
