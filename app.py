@@ -20,7 +20,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🏛️ HRF QUANT MASTER PLATFORM V2.2")
+st.title("🏛️ HRF QUANT MASTER PLATFORM V2.3")
 st.caption("Unified Quantitative Ecosystem with Unlimited Historical Depth Pipelines — Model By HRF")
 st.divider()
 
@@ -65,10 +65,16 @@ def fetch_unlimited_history(symbol, exchange, interval_str, max_bars):
     Fetches market history. Automatically deploys a public Binance direct REST api 
     failover link if TradingView hits an intraday data depth ceiling.
     """
+    # FIX: Map text inputs cleanly to actual inner library configurations
     interval_map_tv = {
-        '1m': Interval.in_1_minute, '5m': Interval.in_5_minute, '15m': Interval.in_15_minute, 
-        '1h': Interval.in_1_hour, '4h': Interval.in_4_hour, '1d': Interval.in_daily, 
-        '1w': Interval.in_weekly, '1m_macro': Interval.in_monthly
+        '1m': Interval.in_1_minute, 
+        '5m': Interval.in_5_minute, 
+        '15m': Interval.in_15_minute, 
+        '1h': Interval.in_1_hour, 
+        '4h': Interval.in_4_hour, 
+        '1d': Interval.in_daily, 
+        '1w': Interval.in_weekly, 
+        '1m_macro': Interval.in_monthly
     }
     
     # Try TradingView Pipeline First
@@ -89,7 +95,7 @@ def fetch_unlimited_history(symbol, exchange, interval_str, max_bars):
             b_int = binance_intervals.get(interval_str.lower(), '1d')
             
             url = f"https://api.binance.com/api/v3/klines"
-            params = {"symbol": symbol, "interval": b_int, "limit": min(max_bars, 1000)}
+            params = {"symbol": symbol, "interval": b_int, "limit": 1000}
             response = requests.get(url, params=params)
             
             if response.status_code == 200:
@@ -138,7 +144,7 @@ if app_mode == "Algorithmic Fractal Scan":
     s_pool = st.sidebar.selectbox("Scan Matching Pool Range", ["All Assets"] + list(ticker_map.keys()), index=0)
     
     # Fully updated with complete timeframes list including 4h
-    i_choice = st.sidebar.selectbox("Sequence Time Frame Interval", ['1M', '1w', '1d', '4h', '1h', '15m', '5m'], index=2)
+    i_choice = st.sidebar.selectbox("Sequence Time Frame Interval", ['1M', '1w', '1d', '4h', '1h', '15m', '5m'], index=3)
     f_mode = st.sidebar.selectbox("Framework Processing Mode", ["Calculate Fractals", "Manual Compare"], index=0)
     
     st.sidebar.markdown("### 📊 Inter-Asset Correlation Layer")
@@ -174,8 +180,8 @@ if app_mode == "Algorithmic Fractal Scan":
         st.error("⚠️ Input Parse Warning: Confirm all dynamic inputs contain clean numeric integers.")
         st.stop()
 
-    # Dynamic scaling limit based on interval constraints
-    max_bars = 25000 if i_choice in ['1d', '1w', '1M'] else 6500
+    # Dynamic scaling limit maximized to ensure deep history arrays
+    max_bars = 25000
     sym, exch = ticker_map[t_asset]
     
     try:
