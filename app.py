@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import requests
 from tvDatafeed import TvDatafeed, Interval
 
 # --- UNIFIED SYSTEM INITIALIZATION ---
@@ -19,8 +20,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🏛️ HRF QUANT MASTER PLATFORM V2.1")
-st.caption("Unified Quantitative Ecosystem with Rolling Inter-Asset Correlation Matrices — Model By HRF")
+st.title("🏛️ HRF QUANT MASTER PLATFORM V2.2")
+st.caption("Unified Quantitative Ecosystem with Unlimited Historical Depth Pipelines — Model By HRF")
 st.divider()
 
 # --- DUAL-ENGINE NAVIGATION ---
@@ -57,13 +58,59 @@ def get_election_regime(year):
     else: return 'Pre-Election'
 
 # ==============================================================================
+# UNLIMITED HISTORICAL DEPTH FETCHING PIPELINE ENGINE
+# ==============================================================================
+def fetch_unlimited_history(symbol, exchange, interval_str, max_bars):
+    """
+    Fetches market history. Automatically deploys a public Binance direct REST api 
+    failover link if TradingView hits an intraday data depth ceiling.
+    """
+    interval_map_tv = {
+        '1m': Interval.in_1_minute, '5m': Interval.in_5_minute, '15m': Interval.in_15_minute, 
+        '1h': Interval.in_1_hour, '4h': Interval.in_4_hour, '1d': Interval.in_daily, 
+        '1w': Interval.in_weekly, '1m_macro': Interval.in_monthly
+    }
+    
+    # Try TradingView Pipeline First
+    try:
+        tv = TvDatafeed()
+        tv_interval = interval_map_tv.get(interval_str.lower(), Interval.in_daily)
+        df = tv.get_hist(symbol=symbol, exchange=exchange, interval=tv_interval, n_bars=max_bars)
+        if df is not None and not df.empty:
+            df.index = pd.to_datetime(df.index).tz_localize(None)
+            return df
+    except:
+        pass
+
+    # Failover to Binance Public API if requesting crypto assets for deep historical tracking
+    if "USDT" in symbol or symbol == "BTCUSDT":
+        try:
+            binance_intervals = {'1m': '1m', '5m': '5m', '15m': '15m', '1h': '1h', '4h': '4h', '1d': '1d', '1w': '1w'}
+            b_int = binance_intervals.get(interval_str.lower(), '1d')
+            
+            url = f"https://api.binance.com/api/v3/klines"
+            params = {"symbol": symbol, "interval": b_int, "limit": min(max_bars, 1000)}
+            response = requests.get(url, params=params)
+            
+            if response.status_code == 200:
+                raw_data = response.json()
+                df_b = pd.DataFrame(raw_data, columns=[
+                    'open_time', 'open', 'high', 'low', 'close', 'volume', 
+                    'close_time', 'qav', 'num_trades', 'taker_base', 'taker_quote', 'ignore'
+                ])
+                df_b.index = pd.to_datetime(df_b['open_time'], unit='ms')
+                for col in ['open', 'high', 'low', 'close', 'volume']:
+                    df_b[col] = df_b[col].astype(float)
+                return df_b[['open', 'high', 'low', 'close', 'volume']]
+        except:
+            pass
+            
+    return None
+
+# ==============================================================================
 # FIXED INTER-ASSET SEQUENTIAL CORRELATION MATH PIPELINE
 # ==============================================================================
 def calculate_rolling_correlation(series_a, series_b, lookback_window):
-    """
-    Computes a point-by-point rolling correlation based on chart index positions,
-    completely bypassing calendar date mismatch conflicts.
-    """
     arr_a = np.array(series_a, dtype=float).flatten()
     arr_b = np.array(series_b, dtype=float).flatten()
     
@@ -74,11 +121,7 @@ def calculate_rolling_correlation(series_a, series_b, lookback_window):
     arr_a = arr_a[:min_len]
     arr_b = arr_b[:min_len]
     
-    df = pd.DataFrame({
-        'Target_Curve': arr_a,
-        'Match_Curve': arr_b
-    })
-    
+    df = pd.DataFrame({'Target_Curve': arr_a, 'Match_Curve': arr_b})
     df['Ret_A'] = df['Target_Curve'].pct_change()
     df['Ret_C'] = df['Match_Curve'].pct_change()
     
@@ -93,7 +136,9 @@ if app_mode == "Algorithmic Fractal Scan":
     
     t_asset = st.sidebar.selectbox("Baseline Target Asset", list(ticker_map.keys()), index=0)
     s_pool = st.sidebar.selectbox("Scan Matching Pool Range", ["All Assets"] + list(ticker_map.keys()), index=0)
-    i_choice = st.sidebar.selectbox("Sequence Time Frame Interval", ['1M', '1w', '1d', '1h', '15m', '5m'], index=2)
+    
+    # Fully updated with complete timeframes list including 4h
+    i_choice = st.sidebar.selectbox("Sequence Time Frame Interval", ['1M', '1w', '1d', '4h', '1h', '15m', '5m'], index=2)
     f_mode = st.sidebar.selectbox("Framework Processing Mode", ["Calculate Fractals", "Manual Compare"], index=0)
     
     st.sidebar.markdown("### 📊 Inter-Asset Correlation Layer")
@@ -129,16 +174,16 @@ if app_mode == "Algorithmic Fractal Scan":
         st.error("⚠️ Input Parse Warning: Confirm all dynamic inputs contain clean numeric integers.")
         st.stop()
 
-    interval_map = {'1m': Interval.in_1_minute, '5m': Interval.in_5_minute, '15m': Interval.in_15_minute, '1h': Interval.in_1_hour, '1d': Interval.in_daily, '1w': Interval.in_weekly, '1M': Interval.in_monthly}
-    chosen_interval = interval_map.get(i_choice.lower(), Interval.in_daily)
-    max_bars = 16000 if i_choice in ['1d', '1w', '1M'] else 4900
-
-    tv = TvDatafeed()
+    # Dynamic scaling limit based on interval constraints
+    max_bars = 25000 if i_choice in ['1d', '1w', '1M'] else 6500
     sym, exch = ticker_map[t_asset]
     
     try:
-        df_target = tv.get_hist(symbol=sym, exchange=exch, interval=chosen_interval, n_bars=max_bars)
-        df_target.index = pd.to_datetime(df_target.index).tz_localize(None)
+        df_target = fetch_unlimited_history(sym, exch, i_choice, max_bars)
+        if df_target is None or df_target.empty:
+            st.error("❌ Network Interface Disconnected: Data source streams empty.")
+            st.stop()
+            
         close_target = df_target['close'].dropna()
         
         start_clean = start_d.strip().lower()
@@ -195,7 +240,6 @@ if app_mode == "Algorithmic Fractal Scan":
                     ax1.fill_between(range(len(m_mean)), m_mean - (m_std * std_dev_multiplier), m_mean + (m_std * std_dev_multiplier), color='#ffff00', alpha=0.12)
                 ax1.plot(m_mean, color='#ffff00', linewidth=4, label='MANUAL COMPOSITE MEAN TRACK', zorder=6)
 
-                # Execute dynamic sequential correlation between Cyan curve and Yellow curve
                 if enable_corr and ax2 is not None:
                     r_wave = calculate_rolling_correlation(target_scaled, m_mean, c_win)
                     ax2.plot(r_wave, color='#ffff00', linewidth=2.5, label=f"Rolling {c_win}-Bar Correlation (Cyan vs Yellow Line)")
@@ -209,13 +253,9 @@ if app_mode == "Algorithmic Fractal Scan":
             
             for asset_item in assets_to_scan:
                 s_sym, s_exch = ticker_map[asset_item]
-                try:
-                    df_scan = tv.get_hist(symbol=s_sym, exchange=s_exch, interval=chosen_interval, n_bars=max_bars)
-                    if df_scan is None or df_scan.empty: continue
-                    df_scan.index = pd.to_datetime(df_scan.index).tz_localize(None)
-                    close_scan = df_scan['close'].dropna()
-                except:
-                    continue
+                df_scan = fetch_unlimited_history(s_sym, s_exch, i_choice, max_bars)
+                if df_scan is None or df_scan.empty: continue
+                close_scan = df_scan['close'].dropna()
                 
                 if asset_item == t_asset and (start_clean == 'latest' or end_clean == 'latest'):
                     history_pool = close_scan.iloc[:-target_bars_num].tolist()
@@ -284,7 +324,6 @@ if app_mode == "Algorithmic Fractal Scan":
                     ax1.plot(mean_path_array, color='#ffff00', linewidth=4, label='COMPOSITE FRACTAL MEAN (Excluding 2026)', zorder=6)
                 ax1.axvline(x=target_bars_num - 1, color='#ffffff', linestyle=':', alpha=0.5)
 
-                # In calculation scan mode, correlate the Target Cyan line vs the Composite Mean Yellow line
                 if enable_corr and ax2 is not None and mean_path_array is not None:
                     r_wave = calculate_rolling_correlation(target_scaled, mean_path_array, c_win)
                     ax2.plot(r_wave, color='#ffff00', linewidth=2.5, label=f"Rolling {c_win}-Bar Correlation (Cyan vs Mean Fractal)")
@@ -424,4 +463,3 @@ else:
 
 st.divider()
 st.markdown("<p style='text-align: center; color: #555555;'>--- Model By HRF ---</p>", unsafe_allow_html=True)
-               
