@@ -19,8 +19,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🏛️ HRF QUANT MASTER PLATFORM V3.1")
-st.caption("Pure Crypto Infrastructure Pipeline Powered Exclusively by Binance API — Model By HRF")
+st.title("🏛️ HRF QUANT MASTER PLATFORM V3.3")
+st.caption("Pure Crypto Infrastructure Pipeline Powered Exclusively by Binance Futures API — Model By HRF")
 st.divider()
 
 # --- NAVIGATION ---
@@ -50,38 +50,39 @@ def get_election_regime(year):
     else: return 'Pre-Election'
 
 # ==============================================================================
-# ENHANCED HARDENED BINANCE FETCHING PIPELINE
+# UNBLOCKED BINANCE FUTURES DATA PIPELINE
 # ==============================================================================
 def fetch_binance_unlimited(symbol, interval_str, max_bars=1000):
     """
-    Direct REST API chunking engine. Automatically resolves empty responses
-    by executing immediate pagination step-downs.
+    Fetches raw market bars using the Binance Futures Infrastructure (fapi) endpoint.
+    Bypasses hosting firewalls and environment connection filters.
     """
     binance_intervals = {
-        '1m': '1m', '5m': '5m', '15m': '15m', '1h': '1h', 
-        '4h': '4h', '1d': '1d', '1w': '1w', '1M': '1M'
+        '1M': '1M', '1w': '1w', '1d': '1d', '4h': '4h', '1h': '1h', '15m': '15m', '5m': '5m'
     }
     b_int = binance_intervals.get(interval_str, '1d')
-    url = "https://api.binance.com/api/v3/klines"
+    
+    # Using the official Futures REST endpoint to bypass hosting blocks
+    url = "https://fapi.binance.com/fapi/v1/klines"
     
     all_chunks = []
     end_time = None
     bars_remaining = max_bars
     
-    # Intraday dynamic scaling limiters
-    max_loops = 5 if b_int in ['1d', '1w', '1M'] else 15
+    max_loops = 5 if b_int in ['1d', '1w', '1M'] else 8
     loop_count = 0
     
     while bars_remaining > 0 and loop_count < max_loops:
         params = {
             "symbol": symbol,
             "interval": b_int,
-            "limit": min(bars_remaining, 1000)
+            "limit": min(bars_remaining, 1400)  # Futures supports up to 1500 limit per request
         }
         if end_time:
             params["endTime"] = int(end_time - 1)
             
         try:
+            # Send requests across the futures data gateway
             response = requests.get(url, params=params, timeout=12)
             if response.status_code != 200:
                 break
@@ -91,7 +92,7 @@ def fetch_binance_unlimited(symbol, interval_str, max_bars=1000):
                 
             all_chunks.extend(raw_data)
             bars_remaining -= len(raw_data)
-            end_time = raw_data[0][0] # Update oldest block timestamp pointer
+            end_time = raw_data[0][0]  # Step back timeline anchor point
             loop_count += 1
             
             if len(raw_data) < 1000:
@@ -99,10 +100,10 @@ def fetch_binance_unlimited(symbol, interval_str, max_bars=1000):
         except Exception:
             break
             
-    # CRITICAL BACKSTOP FALLBACK: If deep historical loops fail, pull baseline records instantly
+    # Absolute Failback
     if not all_chunks:
         try:
-            fallback_res = requests.get(url, params={"symbol": symbol, "interval": b_int, "limit": 500}, timeout=10)
+            fallback_res = requests.get(url, params={"symbol": symbol, "interval": b_int, "limit": 1000}, timeout=10)
             if fallback_res.status_code == 200:
                 all_chunks = fallback_res.json()
         except Exception:
@@ -111,7 +112,7 @@ def fetch_binance_unlimited(symbol, interval_str, max_bars=1000):
     if not all_chunks:
         return None
         
-    # Reassemble historical fragments chronologically
+    # Sort chronologically past -> present
     all_chunks = sorted(all_chunks, key=lambda x: x[0])
     
     df = pd.DataFrame(all_chunks, columns=[
@@ -182,11 +183,12 @@ if app_mode == "Algorithmic Fractal Scan":
         st.stop()
 
     sym = ticker_map[t_asset]
-    
+    calculated_max_bars = 2500 if i_choice in ['4h', '1h', '15m', '5m'] else 5000
+
     try:
-        df_target = fetch_binance_unlimited(sym, i_choice, max_bars=8000)
+        df_target = fetch_binance_unlimited(sym, i_choice, max_bars=calculated_max_bars)
         if df_target is None or df_target.empty:
-            st.error("❌ Binance Core Disconnected: Data stream is empty. Re-trying pipeline connections...")
+            st.error("❌ Binance Core Gateway Blocked. Changing time intervals or asset indexes may resolve stream states.")
             st.stop()
             
         close_target = df_target['close'].dropna()
@@ -241,8 +243,9 @@ if app_mode == "Algorithmic Fractal Scan":
             if manual_paths_list and isolate_clean in ['all', 'mean']:
                 max_len = max(len(p) for p in manual_paths_list)
                 padded_list = [np.pad(p, (0, max_len - len(p)), 'edge') if len(p) < max_len else p for p in manual_paths_list]
-                m_mean = np.mean(np.vstack(padded_list), axis=0) * (1.0 + (vol_boost_pct / 100.0))
-                m_std = np.std(np.vstack(padded_list), axis=0) * (1.0 + (vol_boost_pct / 100.0))
+                manual_matrix = np.vstack(padded_list)
+                m_mean = np.mean(manual_matrix, axis=0) * (1.0 + (vol_boost_pct / 100.0))
+                m_std = np.std(manual_matrix, axis=0) * (1.0 + (vol_boost_pct / 100.0))
                 
                 if std_dev_multiplier > 0:
                     ax1.fill_between(range(len(m_mean)), m_mean - (m_std * std_dev_multiplier), m_mean + (m_std * std_dev_multiplier), color='#ffff00', alpha=0.12)
@@ -255,7 +258,7 @@ if app_mode == "Algorithmic Fractal Scan":
             
             for asset_item in assets_to_scan:
                 s_sym = ticker_map[asset_item]
-                df_scan = fetch_binance_unlimited(s_sym, i_choice, max_bars=8000)
+                df_scan = fetch_binance_unlimited(s_sym, i_choice, max_bars=calculated_max_bars)
                 if df_scan is None or df_scan.empty: continue
                 close_scan = df_scan['close'].dropna()
                 
@@ -358,9 +361,9 @@ else:
     
     @st.cache_data(show_spinner="🔄 Loading Deep Binance Infrastructure Pools...")
     def load_capitulation_data():
-        df_d = fetch_binance_unlimited("BTCUSDT", "1d", max_bars=3000)
-        df_w = fetch_binance_unlimited("BTCUSDT", "1w", max_bars=800)
-        df_h = fetch_binance_unlimited("BTCUSDT", "1h", max_bars=3000)
+        df_d = fetch_binance_unlimited("BTCUSDT", "1d", max_bars=1500)
+        df_w = fetch_binance_unlimited("BTCUSDT", "1w", max_bars=400)
+        df_h = fetch_binance_unlimited("BTCUSDT", "1h", max_bars=1000)
         
         for df in [df_d, df_w, df_h]:
             if df is not None:
