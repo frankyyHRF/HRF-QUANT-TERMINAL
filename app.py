@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import requests
-from tvDatafeed import TvDatafeed, Interval
+import time
 
 # --- UNIFIED SYSTEM INITIALIZATION ---
 st.set_page_config(page_title="HRF QUANT PLATFORM", layout="wide")
@@ -20,29 +20,22 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🏛️ HRF QUANT MASTER PLATFORM V2.3")
-st.caption("Unified Quantitative Ecosystem with Unlimited Historical Depth Pipelines — Model By HRF")
+st.title("🏛️ HRF QUANT MASTER PLATFORM V3.0")
+st.caption("Pure Crypto Infrastructure Pipeline Powered Exclusively by Binance API — Model By HRF")
 st.divider()
 
-# --- DUAL-ENGINE NAVIGATION ---
+# --- NAVIGATION ---
 app_mode = st.sidebar.selectbox("🚀 Choose Analysis Core Engine", ["Algorithmic Fractal Scan", "Structural Capitulation Wave"])
 
-# Global Setup Configurations
+# 100% Purified Crypto Assets Asset Mapping
 ticker_map = {
-    'Bitcoin (BTC)': ('BTCUSDT', 'BINANCE'),
-    'Ethereum (ETH)': ('ETHUSDT', 'BINANCE'),
-    'Ripple (XRP)': ('XRPUSDT', 'BINANCE'),
-    'Binance Coin (BNB)': ('BNBUSDT', 'BINANCE'),
-    'Solana (SOL)': ('SOLUSDT', 'BINANCE'),
-    'S&P 500 Index (SPY)': ('SPY', 'AMEX'),
-    'Nasdaq 100 (QQQ)': ('QQQ', 'NASDAQ'),
-    'Hang Seng Index (HSI)': ('HSI', 'INDEX'),
-    'Gold (GLD)': ('GLD', 'AMEX'),
-    'Silver (SLV)': ('SLV', 'AMEX'),
-    'Palladium Futures': ('PALL', 'AMEX'),
-    'EUR/USD': ('EURUSD', 'FX_IDC'),
-    'USD/JPY': ('USDJPY', 'FX_IDC'),
-    'GBP/USD': ('GBPUSD', 'FX_IDC')
+    'Bitcoin (BTC)': 'BTCUSDT',
+    'Ethereum (ETH)': 'ETHUSDT',
+    'Ripple (XRP)': 'XRPUSDT',
+    'Binance Coin (BNB)': 'BNBUSDT',
+    'Solana (SOL)': 'SOLUSDT',
+    'Cardano (ADA)': 'ADAUSDT',
+    'Dogecoin (DOGE)': 'DOGEUSDT'
 }
 
 def percentage_return_scale(series):
@@ -58,93 +51,93 @@ def get_election_regime(year):
     else: return 'Pre-Election'
 
 # ==============================================================================
-# UNLIMITED HISTORICAL DEPTH FETCHING PIPELINE ENGINE
+# DEEP-LOOP BINANCE HISTORICAL PAGINATION ENGINE
 # ==============================================================================
-def fetch_unlimited_history(symbol, exchange, interval_str, max_bars):
+def fetch_binance_unlimited(symbol, interval_str, max_bars=15000):
     """
-    Fetches market history. Automatically deploys a public Binance direct REST api 
-    failover link if TradingView hits an intraday data depth ceiling.
+    Direct REST API chunking system. Loops backward to pull thousands of historical bars 
+    to enable deep multi-year fractal lookbacks for 4h intervals without using TV libraries.
     """
-    # FIX: Map text inputs cleanly to actual inner library configurations
-    interval_map_tv = {
-        '1m': Interval.in_1_minute, 
-        '5m': Interval.in_5_minute, 
-        '15m': Interval.in_15_minute, 
-        '1h': Interval.in_1_hour, 
-        '4h': Interval.in_4_hour, 
-        '1d': Interval.in_daily, 
-        '1w': Interval.in_weekly, 
-        '1m_macro': Interval.in_monthly
+    binance_intervals = {
+        '1m': '1m', '5m': '5m', '15m': '15m', '1h': '1h', 
+        '4h': '4h', '1d': '1d', '1w': '1w', '1M': '1M'
     }
+    b_int = binance_intervals.get(interval_str, '1d')
+    url = "https://api.binance.com/api/v3/klines"
     
-    # Try TradingView Pipeline First
-    try:
-        tv = TvDatafeed()
-        tv_interval = interval_map_tv.get(interval_str.lower(), Interval.in_daily)
-        df = tv.get_hist(symbol=symbol, exchange=exchange, interval=tv_interval, n_bars=max_bars)
-        if df is not None and not df.empty:
-            df.index = pd.to_datetime(df.index).tz_localize(None)
-            return df
-    except:
-        pass
-
-    # Failover to Binance Public API if requesting crypto assets for deep historical tracking
-    if "USDT" in symbol or symbol == "BTCUSDT":
+    all_chunks = []
+    end_time = None
+    bars_remaining = max_bars
+    
+    # Intraday throttling safety mechanism
+    max_loops = 25 if b_int in ['4h', '1h', '15m'] else 5
+    loop_count = 0
+    
+    while bars_remaining > 0 and loop_count < max_loops:
+        params = {
+            "symbol": symbol,
+            "interval": b_int,
+            "limit": min(bars_remaining, 1000)
+        }
+        if end_time:
+            params["endTime"] = end_time - 1
+            
         try:
-            binance_intervals = {'1m': '1m', '5m': '5m', '15m': '15m', '1h': '1h', '4h': '4h', '1d': '1d', '1w': '1w'}
-            b_int = binance_intervals.get(interval_str.lower(), '1d')
+            response = requests.get(url, params=params, timeout=10)
+            if response.status_code != 200:
+                break
+            raw_data = response.json()
+            if not raw_data:
+                break
+                
+            all_chunks.extend(raw_data)
+            bars_remaining -= len(raw_data)
+            end_time = raw_data[0][0] # Move pointer to the oldest block's open timestamp
+            loop_count += 1
             
-            url = f"https://api.binance.com/api/v3/klines"
-            params = {"symbol": symbol, "interval": b_int, "limit": 1000}
-            response = requests.get(url, params=params)
+            if len(raw_data) < 1000:
+                break # Reached the absolute end of data genesis listing
+        except Exception:
+            break
             
-            if response.status_code == 200:
-                raw_data = response.json()
-                df_b = pd.DataFrame(raw_data, columns=[
-                    'open_time', 'open', 'high', 'low', 'close', 'volume', 
-                    'close_time', 'qav', 'num_trades', 'taker_base', 'taker_quote', 'ignore'
-                ])
-                df_b.index = pd.to_datetime(df_b['open_time'], unit='ms')
-                for col in ['open', 'high', 'low', 'close', 'volume']:
-                    df_b[col] = df_b[col].astype(float)
-                return df_b[['open', 'high', 'low', 'close', 'volume']]
-        except:
-            pass
-            
-    return None
+    if not all_chunks:
+        return None
+        
+    # Rebuild chronologically from past to present
+    all_chunks = sorted(all_chunks, key=lambda x: x[0])
+    
+    df = pd.DataFrame(all_chunks, columns=[
+        'open_time', 'open', 'high', 'low', 'close', 'volume', 
+        'close_time', 'qav', 'num_trades', 'taker_base', 'taker_quote', 'ignore'
+    ])
+    df.index = pd.to_datetime(df['open_time'], unit='ms')
+    for col in ['open', 'high', 'low', 'close', 'volume']:
+        df[col] = df[col].astype(float)
+        
+    return df[['open', 'high', 'low', 'close', 'volume']]
 
 # ==============================================================================
-# FIXED INTER-ASSET SEQUENTIAL CORRELATION MATH PIPELINE
+# SEQUENTIAL CORRELATION SYSTEM
 # ==============================================================================
 def calculate_rolling_correlation(series_a, series_b, lookback_window):
     arr_a = np.array(series_a, dtype=float).flatten()
     arr_b = np.array(series_b, dtype=float).flatten()
-    
     min_len = min(len(arr_a), len(arr_b))
-    if min_len == 0:
-        return []
-        
-    arr_a = arr_a[:min_len]
-    arr_b = arr_b[:min_len]
-    
-    df = pd.DataFrame({'Target_Curve': arr_a, 'Match_Curve': arr_b})
+    if min_len == 0: return []
+    df = pd.DataFrame({'Target_Curve': arr_a[:min_len], 'Match_Curve': arr_b[:min_len]})
     df['Ret_A'] = df['Target_Curve'].pct_change()
     df['Ret_C'] = df['Match_Curve'].pct_change()
-    
-    df['Rolling_R'] = df['Ret_A'].rolling(window=int(lookback_window)).corr(df['Ret_C'])
-    return df['Rolling_R'].fillna(0.0).tolist()
+    return df['Ret_A'].rolling(window=int(lookback_window)).corr(df['Ret_C']).fillna(0.0).tolist()
 
 # ==============================================================================
-# ENGINE MODULE 1: ALGORITHMIC FRACTAL GRID SCANNER
+# ALGORITHMIC FRACTAL CORE ENGINE
 # ==============================================================================
 if app_mode == "Algorithmic Fractal Scan":
-    st.header("🎯 Algorithmic Fractal, Structural Sandbox & Correlation Grid")
+    st.header("🎯 Binance Direct Fractal Core Scanner")
     
     t_asset = st.sidebar.selectbox("Baseline Target Asset", list(ticker_map.keys()), index=0)
     s_pool = st.sidebar.selectbox("Scan Matching Pool Range", ["All Assets"] + list(ticker_map.keys()), index=0)
-    
-    # Fully updated with complete timeframes list including 4h
-    i_choice = st.sidebar.selectbox("Sequence Time Frame Interval", ['1M', '1w', '1d', '4h', '1h', '15m', '5m'], index=3)
+    i_choice = st.sidebar.selectbox("Sequence Time Frame Interval", ['1M', '1w', '1d', '4h', '1h', '15m', '5m'], index=3) # Defaulting straight to 4h
     f_mode = st.sidebar.selectbox("Framework Processing Mode", ["Calculate Fractals", "Manual Compare"], index=0)
     
     st.sidebar.markdown("### 📊 Inter-Asset Correlation Layer")
@@ -154,8 +147,8 @@ if app_mode == "Algorithmic Fractal Scan":
     start_d = st.sidebar.text_input("Analysis Target Window Start", value="latest")
     end_d = st.sidebar.text_input("Analysis Target Window End", value="latest")
     
-    ov_starts = st.sidebar.text_input("Manual Overlay Window Starts (Comma Separated)", value="2020-03-01, 2022-11-01")
-    ov_ends = st.sidebar.text_input("Manual Overlay Window Ends (Comma Separated)", value="2020-05-01, 2023-01-01")
+    ov_starts = st.sidebar.text_input("Manual Overlay Window Starts", value="2020-03-01, 2022-11-01")
+    ov_ends = st.sidebar.text_input("Manual Overlay Window Ends", value="2020-05-01, 2023-01-01")
     
     t_bars = st.sidebar.text_input("Scanning Sequence Width (Bars)", value="30")
     f_bars = st.sidebar.text_input("Forward Projection Target (Bars)", value="15")
@@ -180,18 +173,15 @@ if app_mode == "Algorithmic Fractal Scan":
         st.error("⚠️ Input Parse Warning: Confirm all dynamic inputs contain clean numeric integers.")
         st.stop()
 
-    # Dynamic scaling limit maximized to ensure deep history arrays
-    max_bars = 25000
-    sym, exch = ticker_map[t_asset]
+    sym = ticker_map[t_asset]
     
     try:
-        df_target = fetch_unlimited_history(sym, exch, i_choice, max_bars)
+        df_target = fetch_binance_unlimited(sym, i_choice, max_bars=15000)
         if df_target is None or df_target.empty:
-            st.error("❌ Network Interface Disconnected: Data source streams empty.")
+            st.error("❌ Binance Core Disconnected: Data stream is empty.")
             st.stop()
             
         close_target = df_target['close'].dropna()
-        
         start_clean = start_d.strip().lower()
         end_clean = end_d.strip().lower()
         
@@ -221,8 +211,8 @@ if app_mode == "Algorithmic Fractal Scan":
             starts = [s.strip() for s in ov_starts.split(',') if s.strip()]
             ends = [e.strip() for e in ov_ends.split(',') if e.strip()]
             manual_paths_list = []
-            
             isolate_clean = iso_path.strip().lower()
+            
             for idx, (st_val, ed_val) in enumerate(zip(starts, ends)):
                 try:
                     ov_df = close_target.loc[pd.to_datetime(st_val):pd.to_datetime(ed_val)]
@@ -238,19 +228,12 @@ if app_mode == "Algorithmic Fractal Scan":
             if manual_paths_list and isolate_clean in ['all', 'mean']:
                 max_len = max(len(p) for p in manual_paths_list)
                 padded_list = [np.pad(p, (0, max_len - len(p)), 'edge') if len(p) < max_len else p for p in manual_paths_list]
-                manual_matrix = np.vstack(padded_list)
-                m_mean = np.mean(manual_matrix, axis=0) * (1.0 + (vol_boost_pct / 100.0))
-                m_std = np.std(manual_matrix, axis=0) * (1.0 + (vol_boost_pct / 100.0))
+                m_mean = np.mean(np.vstack(padded_list), axis=0) * (1.0 + (vol_boost_pct / 100.0))
+                m_std = np.std(np.vstack(padded_list), axis=0) * (1.0 + (vol_boost_pct / 100.0))
                 
                 if std_dev_multiplier > 0:
                     ax1.fill_between(range(len(m_mean)), m_mean - (m_std * std_dev_multiplier), m_mean + (m_std * std_dev_multiplier), color='#ffff00', alpha=0.12)
                 ax1.plot(m_mean, color='#ffff00', linewidth=4, label='MANUAL COMPOSITE MEAN TRACK', zorder=6)
-
-                if enable_corr and ax2 is not None:
-                    r_wave = calculate_rolling_correlation(target_scaled, m_mean, c_win)
-                    ax2.plot(r_wave, color='#ffff00', linewidth=2.5, label=f"Rolling {c_win}-Bar Correlation (Cyan vs Yellow Line)")
-                    ax2.fill_between(range(len(r_wave)), r_wave, 0, where=(np.array(r_wave) >= 0), color='#00ff88', alpha=0.15)
-                    ax2.fill_between(range(len(r_wave)), r_wave, 0, where=(np.array(r_wave) < 0), color='#ff0055', alpha=0.15)
 
         # --- CALCULATE FRACTALS MODE ---
         else:
@@ -258,8 +241,8 @@ if app_mode == "Algorithmic Fractal Scan":
             all_discovered_results = []
             
             for asset_item in assets_to_scan:
-                s_sym, s_exch = ticker_map[asset_item]
-                df_scan = fetch_unlimited_history(s_sym, s_exch, i_choice, max_bars)
+                s_sym = ticker_map[asset_item]
+                df_scan = fetch_binance_unlimited(s_sym, i_choice, max_bars=15000)
                 if df_scan is None or df_scan.empty: continue
                 close_scan = df_scan['close'].dropna()
                 
@@ -309,13 +292,12 @@ if app_mode == "Algorithmic Fractal Scan":
                 all_scaled_paths_list = []
                 for row in unique_matches:
                     raw_full = row['raw_prices']
-                    base_p = raw_full[0]
-                    scaled_full = ((np.array(raw_full) - base_p) / base_p) * 100.0 if base_p != 0 else np.zeros_like(raw_full)
+                    scaled_full = ((np.array(raw_full) - raw_full[0]) / raw_full[0]) * 100.0 if raw_full[0] != 0 else np.zeros_like(raw_full)
                     all_scaled_paths_list.append(scaled_full)
                     
                 mean_path_array = np.mean(np.vstack(all_scaled_paths_list), axis=0) * (1.0 + (vol_boost_pct / 100.0)) if all_scaled_paths_list else None
-                
                 isolate_clean = iso_path.strip().lower()
+                
                 if isolate_clean != 'mean':
                     for idx, row in enumerate(unique_matches):
                         if isolate_clean.isdigit() and int(isolate_clean) != idx + 1: continue
@@ -332,53 +314,45 @@ if app_mode == "Algorithmic Fractal Scan":
 
                 if enable_corr and ax2 is not None and mean_path_array is not None:
                     r_wave = calculate_rolling_correlation(target_scaled, mean_path_array, c_win)
-                    ax2.plot(r_wave, color='#ffff00', linewidth=2.5, label=f"Rolling {c_win}-Bar Correlation (Cyan vs Mean Fractal)")
+                    ax2.plot(r_wave, color='#ffff00', linewidth=2.5, label=f"Rolling {c_win}-Bar Correlation")
                     ax2.fill_between(range(len(r_wave)), r_wave, 0, where=(np.array(r_wave) >= 0), color='#00ff88', alpha=0.15)
                     ax2.fill_between(range(len(r_wave)), r_wave, 0, where=(np.array(r_wave) < 0), color='#ff0055', alpha=0.15)
 
         ax1.axhline(y=0.0, color='#555555', linestyle='-', linewidth=1.2)
-        ax1.set_title("HRF MATRIX ENGINE — UNIFIED MULTI-ASSET CORE CANVAS", color='#ffffff', fontsize=12, fontweight='bold')
+        ax1.set_title("HRF MATRIX ENGINE — UNIFIED CRYPTO CORE CANVAS", color='#ffffff', fontsize=12, fontweight='bold')
         ax1.set_ylabel("Percentage Performance Shift (%)")
         ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:+.1f}%'))
         ax1.legend(loc='upper left', facecolor='#111111', edgecolor='#333333')
         
         if enable_corr and ax2 is not None:
             ax2.axhline(0.0, color='#ffffff', linestyle='-', linewidth=0.8, alpha=0.5)
-            ax2.axhline(0.7, color='#00ff88', linestyle=':', alpha=0.8, label="High Correlation (> 0.7)")
-            ax2.axhline(-0.7, color='#ff0055', linestyle=':', alpha=0.8, label="Inverse Separation (< -0.7)")
             ax2.set_ylim(-1.05, 1.05)
             ax2.set_ylabel("Correlation R-Scale")
             ax2.grid(True, color='#222222')
-            ax2.legend(loc='lower left', facecolor='#111111', fontsize=9)
         
         plt.tight_layout()
         st.pyplot(fig_frac)
-
     except Exception as e:
-        st.error(f"Ecosystem loading block halted: {e}")
+        st.error(f"Ecosystem halted: {e}")
 
 # ==============================================================================
 # ENGINE MODULE 2: CAPITULATION & DAYS SINCE RESET ENGINE
 # ==============================================================================
 else:
     st.header("⏱️ Path-Dependent Peak-To-Trough Reset Wave")
-    
     vol_input = st.sidebar.text_input("Volatility Reset Threshold (%)", value="-40.0")
     pattern_input = st.sidebar.text_input("Candle Sequence Pattern (G/R)", value="RRGG")
     
-    @st.cache_data(show_spinner="🔄 Streaming historical data streams...")
+    @st.cache_data(show_spinner="🔄 Loading Deep Binance Infrastructure Pools...")
     def load_capitulation_data():
-        tv = TvDatafeed()
-        df_d = tv.get_hist(symbol="BLX", exchange="BNC", interval=Interval.in_daily, n_bars=18000)
-        df_d.index = pd.to_datetime(df_d.index).tz_localize(None)
-        df_w = tv.get_hist(symbol="BLX", exchange="BNC", interval=Interval.in_weekly, n_bars=2000)
-        df_w.index = pd.to_datetime(df_w.index).tz_localize(None)
-        df_h = tv.get_hist(symbol="BTCUSDT", exchange="BINANCE", interval=Interval.in_1_hour, n_bars=15000)
-        df_h.index = pd.to_datetime(df_h.index).tz_localize(None)
+        df_d = fetch_binance_unlimited("BTCUSDT", "1d", max_bars=4000)
+        df_w = fetch_binance_unlimited("BTCUSDT", "1w", max_bars=1000)
+        df_h = fetch_binance_unlimited("BTCUSDT", "1h", max_bars=4000)
         
         for df in [df_d, df_w, df_h]:
-            df['return'] = ((df['close'] - df['open']) / df['open']) * 100.0
-            df['is_midterm'] = (df.index.year % 4 == 2)
+            if df is not None:
+                df['return'] = ((df['close'] - df['open']) / df['open']) * 100.0
+                df['is_midterm'] = (df.index.year % 4 == 2)
         return df_d, df_w, df_h
 
     try:
@@ -398,7 +372,6 @@ else:
                 drawdown_pct = ((current_low - running_peak) / running_peak) * 100.0
                 if drawdown_pct <= thresh:
                     days_since_tracker.append(0)
-                    if current_accumulator > 0: historical_gaps.append(current_accumulator)
                     current_accumulator = 0
                     running_peak = current_high
                 else:
@@ -413,7 +386,6 @@ else:
                 expansion_pct = ((current_high - running_trough) / running_trough) * 100.0
                 if expansion_pct >= thresh:
                     days_since_tracker.append(0)
-                    if current_accumulator > 0: historical_gaps.append(current_accumulator)
                     current_accumulator = 0
                     running_trough = current_low
                 else:
@@ -421,11 +393,9 @@ else:
                     days_since_tracker.append(current_accumulator)
         
         current_live_gap = days_since_tracker[-1]
-        
         clean_pattern = pattern_input.strip().upper()
         candle_string_sequence = "".join(['G' if r >= 0 else 'R' for r in df_daily['return'].tolist()])
         match_indices = [i + len(clean_pattern) for i in range(len(candle_string_sequence) - len(clean_pattern)) if candle_string_sequence[i : i + len(clean_pattern)] == clean_pattern]
-        
         post_pattern_returns = [df_daily['return'].iloc[m] for m in match_indices if m < len(df_daily)]
         
         plt.style.use('dark_background')
@@ -433,21 +403,16 @@ else:
         
         ax1.hist(df_daily['return'].dropna().values, bins=100, range=(-15, 15), color='#8a2be2', alpha=0.6, label='Daily Lifetime')
         ax1.set_title("HISTOGRAM 1: TOTAL DAILY RETURN FREQUENCY", fontweight='bold', fontsize=10)
-        ax1.legend(facecolor='#111111')
-        
         ax2.hist(df_daily[df_daily['is_midterm']]['return'].dropna().values, bins=100, range=(-15, 15), color='#ff0055', alpha=0.6, label='Midterm Regime')
         ax2.set_title("HISTOGRAM 2: MIDTERM YEAR CYCLE FREQUENCY", fontweight='bold', fontsize=10)
-        ax2.legend(facecolor='#111111')
         
         ax3.plot(df_daily.index, days_since_tracker, color='#00ffcc', linewidth=1.2, label='Days Since')
         ax3.fill_between(df_daily.index, 0, days_since_tracker, color='#00ffcc', alpha=0.06)
         ax3.set_title("CHART 3: STRUCTURAL RESETS TIMELINE WAVE", fontweight='bold', fontsize=10)
-        ax3.set_xlim(pd.Timestamp('2010-01-01'), pd.Timestamp('2026-07-01'))
         
         if post_pattern_returns:
             ax4.hist(post_pattern_returns, bins=30, range=(-15, 15), color='#ffff00', alpha=0.6, label=f"Post '{clean_pattern}'")
         ax4.set_title("HISTOGRAM 4: FORWARD EDGE PERFORMANCE", fontweight='bold', fontsize=10)
-        ax4.legend(facecolor='#111111')
         
         plt.tight_layout(pad=3.0)
         st.pyplot(fig)
@@ -463,7 +428,6 @@ else:
         col1, col2 = st.columns(2)
         col1.metric("Current Days Stretched Under Matrix", f"{current_live_gap} Days")
         col2.metric(f"Historical '{clean_pattern}' Frequency Discoveries", f"{len(match_indices)} Matches")
-        
     except Exception as ex:
         st.error(f"Execution Error: {ex}")
 
