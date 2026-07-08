@@ -1,417 +1,326 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
+# --- STEP 1: CONFIGURE SYSTEM WORKSPACE DEPENDENCIES ---
+import sys
+import subprocess
+
+print("📥 Checking package dependencies... installing structural calculation modules...")
+dependencies = ["fastdtw", "pandas", "numpy", "matplotlib", "ipywidgets"]
+for package in dependencies:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", package])
+
+# Specific GitHub install rule for updated TradingView data engine stream connections
+subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", "git+https://github.com/rongardF/tvDatafeed.git"])
+print("✅ Environment compiled successfully. Initializing platform modules...")
+
+# --- STEP 2: LOAD MASTER ENGINE PLATFORM ---
+import ipywidgets as widgets
+from ipywidgets import interact_manual
 import matplotlib.pyplot as plt
-import requests
+import numpy as np
+import pandas as pd
+from tvDatafeed import TvDatafeed, Interval
+from fastdtw import fastdtw
 
-# --- UNIFIED SYSTEM INITIALIZATION ---
-st.set_page_config(page_title="HRF QUANT PLATFORM", layout="wide")
-
-# Inject deep dark-mode styling variables for mobile UI clarity
-st.markdown("""
-    <style>
-    .reportview-container { background: #0d0d11; }
-    .sidebar .sidebar-content { background: #13131a; }
-    h1, h2, h3, p, label { color: #ffffff !important; }
-    div.stButton > button:first-child {
-        background-color: #8a2be2; color: white; border-radius: 8px; font-weight: bold; width: 100%;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-st.title("🏛️ HRF QUANT MASTER PLATFORM V4.3")
-st.caption("Universal Intraday & Macro Core Engine — Model By HRF")
-st.divider()
-
-# --- NAVIGATION ---
-app_mode = st.sidebar.selectbox("🚀 Choose Analysis Core Engine", ["Algorithmic Fractal Scan", "Structural Capitulation Wave"])
-
-# Standard Multi-Asset Infrastructure Mapping
-ticker_map = {
-    'Bitcoin (BTC)': 'bitcoin',
-    'Ethereum (ETH)': 'ethereum',
-    'Ripple (XRP)': 'ripple',
-    'Binance Coin (BNB)': 'binancecoin',
-    'Solana (SOL)': 'solana',
-    'Cardano (ADA)': 'cardano',
-    'Dogecoin (DOGE)': 'dogecoin'
-}
+# Initialize public node connection
+tv = TvDatafeed()
 
 def percentage_return_scale(series):
+    """Transforms a price series into percentage returns relative to its starting element."""
     arr = np.array(series, dtype=float).flatten()
     if len(arr) == 0 or arr[0] == 0:
         return np.zeros_like(arr)
     return ((arr - arr[0]) / arr[0]) * 100.0
 
 def get_election_regime(year):
-    if year % 4 == 0: return 'Election Year'
-    elif year % 4 == 1: return 'Post-Election'
-    elif year % 4 == 2: return 'Midterm Year'
-    else: return 'Pre-Election'
-
-# ==============================================================================
-# UNBLOCKED UNLIMITED HYBRID DATA STREAM ENGINE
-# ==============================================================================
-@st.cache_data(ttl=300, show_spinner="🔄 Loading High-Frequency Market Matrix Pools...")
-def fetch_unified_market_data(asset_name, interval_str):
-    """
-    Queries live server networks for standard arrays, and dynamically scales 
-    historical intraday intervals up to 10+ years to avoid cloud lockouts.
-    """
-    cg_id = ticker_map.get(asset_name, 'bitcoin')
-    
-    # Configure parameter requests depending on resolution choices
-    if interval_str in ['1m', '5m', '15m']:
-        url = f"https://api.coingecko.com/api/v3/coins/{cg_id}/market_chart"
-        params = {"vs_currency": "usd", "days": "1"}
-    elif interval_str in ['1h', '4h']:
-        url = f"https://api.coingecko.com/api/v3/coins/{cg_id}/market_chart"
-        params = {"vs_currency": "usd", "days": "90"}
+    """Categorizes any historical year into its exact US Election Cycle branch."""
+    if year % 4 == 0:
+        return 'Election Year'
+    elif year % 4 == 1:
+        return 'Post-Election'
+    elif year % 4 == 2:
+        return 'Midterm Year'
     else:
-        url = f"https://api.coingecko.com/api/v3/coins/{cg_id}/market_chart"
-        params = {"vs_currency": "usd", "days": "max", "interval": "daily"}
+        return 'Pre-Election'
 
+# Asset Data Dictionary Lookups
+ticker_map = {
+    'Bitcoin (BTC)': ('BTCUSDT', 'BINANCE'),
+    'Ethereum (ETH)': ('ETHUSDT', 'BINANCE'),
+    'Ripple (XRP)': ('XRPUSDT', 'BINANCE'),
+    'Binance Coin (BNB)': ('BNBUSDT', 'BINANCE'),
+    'Solana (SOL)': ('SOLUSDT', 'BINANCE'),
+    'S&P 500 Index (SPY)': ('SPY', 'AMEX'),
+    'Nasdaq 100 (QQQ)': ('QQQ', 'NASDAQ'),
+    'Hang Seng Index (HSI)': ('HSI', 'INDEX'),
+    'Gold (GLD)': ('GLD', 'AMEX'),
+    'Silver (SLV)': ('SLV', 'AMEX'),
+    'Palladium Futures': ('PALL', 'AMEX'),
+    'EUR/USD': ('EURUSD', 'FX_IDC'),
+    'USD/JPY': ('USDJPY', 'FX_IDC'),
+    'GBP/USD': ('GBPUSD', 'FX_IDC')
+}
+
+def run_hrf_dashboard(Target_Asset, Scan_Assets, Interval_Choice, Mode, Sort_Priority, Min_Correlation, Max_MSE, Start_Date, End_Date, Overlay_Starts, Overlay_Ends, Target_Bars, Forecast_Bars, Number_Of_Fractals, Isolate_Path, Cycle_Filter, Specific_Years, Exclude_Years, Gap_Bars, Vol_Boost, Std_Dev_Bands):
+    """
+    HRF QUANT PLATFORM — MASTER CORE MATRIX V4
+    Includes Multi-Asset Selection Lists, Priority Engine Filters, Threshold Cutoffs, and Core Stacking.
+    """
     try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(url, params=params, headers=headers, timeout=10)
-        
-        if res.status_code == 200:
-            data = res.json()
-            df_price = pd.DataFrame(data['prices'], columns=['timestamp', 'close'])
-            df_vol = pd.DataFrame(data['total_volumes'], columns=['timestamp', 'volume'])
-            df = pd.merge(df_price, df_vol, on='timestamp')
-            df['time'] = pd.to_datetime(df['timestamp'], unit='ms')
-            df.set_index('time', inplace=True)
-        else:
-            raise Exception("API Limit Hit")
-            
-    except:
-        # --- SYNTHETIC ENGINE FALLBACK ---
-        # If API gives 429 errors or restricts time limits, generate max matrix fields seamlessly
-        periods_map = {'1m': 1000, '5m': 2000, '15m': 3000, '1h': 5000, '4h': 4000, '1d': 6000, '1w': 1000, '1M': 200}
-        n_periods = periods_map.get(interval_str, 2000)
-        
-        freq_map = {'1m': '1T', '5m': '5T', '15m': '15T', '1h': '1H', '4h': '4H', '1d': '1D', '1w': '1W', '1M': '1M'}
-        dates = pd.date_range(end=pd.Timestamp.now(), periods=n_periods, freq=freq_map.get(interval_str, '1D'))
-        
-        np.random.seed(42)
-        returns = np.random.normal(0.0002, 0.015, size=n_periods)
-        price_series = 50000 * np.exp(np.cumsum(returns))
-        volume_series = np.random.uniform(10000, 500000, size=n_periods)
-        
-        df = pd.DataFrame({'close': price_series, 'volume': volume_series}, index=dates)
-
-    # Process structure layers smoothly
-    df['open'] = df['close'].shift(1).fillna(df['close'])
-    df['high'] = df[['open', 'close']].max(axis=1)
-    df['low'] = df[['open', 'close']].min(axis=1)
-    
-    # Resampling conditions
-    if interval_str == '4h' and '4H' not in str(df.index.freq):
-        df = df.resample('4H').agg({'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum'}).dropna()
-    elif interval_str == '1w':
-        df = df.resample('W').agg({'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum'}).dropna()
-    elif interval_str == '1M':
-        df = df.resample('M').agg({'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum'}).dropna()
-
-    return df[['open', 'high', 'low', 'close', 'volume']]
-
-# ==============================================================================
-# STRUCTURAL CORRELATION ENGINE MODULE
-# ==============================================================================
-def calculate_rolling_correlation(series_a, series_b, lookback_window):
-    arr_a = np.array(series_a, dtype=float).flatten()
-    arr_b = np.array(series_b, dtype=float).flatten()
-    min_len = min(len(arr_a), len(arr_b))
-    if min_len == 0: return []
-    df = pd.DataFrame({'Target_Curve': arr_a[:min_len], 'Match_Curve': arr_b[:min_len]})
-    df['Ret_A'] = df['Target_Curve'].pct_change()
-    df['Ret_C'] = df['Match_Curve'].pct_change()
-    return df['Ret_A'].rolling(window=int(lookback_window)).corr(df['Ret_C']).fillna(0.0).tolist()
-
-# ==============================================================================
-# MAIN CORE: ENGINE MODULE 1 (FRACTAL SCANNER)
-# ==============================================================================
-if app_mode == "Algorithmic Fractal Scan":
-    st.header("🎯 Multi-Interval Core Fractal Scan Framework")
-    
-    t_asset = st.sidebar.selectbox("Baseline Target Asset", list(ticker_map.keys()), index=0)
-    s_pool = st.sidebar.selectbox("Scan Matching Pool Range", ["All Assets"] + list(ticker_map.keys()), index=0)
-    i_choice = st.sidebar.selectbox("Sequence Time Frame Interval", ['1M', '1w', '1d', '4h', '1h', '15m', '5m', '1m'], index=2)
-    f_mode = st.sidebar.selectbox("Framework Processing Mode", ["Calculate Fractals", "Manual Compare"], index=0)
-    
-    st.sidebar.markdown("### 📊 Inter-Asset Correlation Layer")
-    enable_corr = st.sidebar.checkbox("Overlay Rolling Macro Asset Correlation", value=False)
-    corr_window = st.sidebar.text_input("Correlation Lookback Window (Bars)", value="10")
-    
-    start_d = st.sidebar.text_input("Analysis Target Window Start", value="latest")
-    end_d = st.sidebar.text_input("Analysis Target Window End", value="latest")
-    
-    ov_starts = st.sidebar.text_input("Manual Overlay Window Starts", value="2020-03-01, 2022-11-01")
-    ov_ends = st.sidebar.text_input("Manual Overlay Window Ends", value="2020-05-01, 2023-01-01")
-    
-    t_bars = st.sidebar.text_input("Scanning Sequence Width (Bars)", value="30")
-    f_bars = st.sidebar.text_input("Forward Projection Target (Bars)", value="15")
-    n_fractals = st.sidebar.text_input("Maximum Displayed Fractals", value="5")
-    iso_path = st.sidebar.text_input("Focus Highlight Mode Target (Number/All/Mean)", value="all")
-    
-    c_filter = st.sidebar.selectbox("US Cycle Macro Regime Filter", ['All Cycles', 'Election Year', 'Post-Election', 'Midterm Year', 'Pre-Election'], index=0)
-    spec_years = st.sidebar.text_input("Restrict Matching to Specific Calendar Years", value="all")
-    g_bars = st.sidebar.text_input("Temporal Separation Buffer Width (Bars)", value="20")
-    v_boost = st.sidebar.text_input("Amplitude Volatility Boost Multiplier (%)", value="0")
-    s_bands = st.sidebar.text_input("Standard Deviation Pipeline Bands (+/-)", value="1.0")
-
-    try:
-        target_bars_num = int(t_bars)
-        forecast_bars_num = int(f_bars)
-        num_fractals_num = int(n_fractals)
-        gap_bars_num = int(g_bars)
-        vol_boost_pct = float(v_boost)
-        std_dev_multiplier = float(s_bands)
-        c_win = int(corr_window)
+        target_bars_num = int(Target_Bars)
+        forecast_bars_num = int(Forecast_Bars)
+        num_fractals_num = int(Number_Of_Fractals)
+        gap_bars_num = int(Gap_Bars)
+        vol_boost_pct = float(Vol_Boost)
+        std_dev_multiplier = float(Std_Dev_Bands)
+        min_corr_val = float(Min_Correlation)
+        max_mse_val = float(Max_MSE)
     except ValueError:
-        st.error("⚠️ Input Parse Warning: Confirm all dynamic inputs contain clean numeric integers.")
-        st.stop()
+        print("⚠️ Parameter Configuration Error: Clean your numeric variables.")
+        return
 
+    interval_map = {
+        '1M': Interval.in_monthly, '1w': Interval.in_weekly, '1d': Interval.in_daily, 
+        '1h': Interval.in_1_hour, '15m': Interval.in_15_minute, '5m': Interval.in_5_minute
+    }
+    chosen_interval = interval_map.get(Interval_Choice, Interval.in_daily)
+    max_bars = 16000 if Interval_Choice in ['1d', '1w', '1M'] else 4900
+
+    print(f"\n🔄 Syncing structural source data line for target asset {Target_Asset}...")
+    sym, exch = ticker_map[Target_Asset]
     try:
-        df_target = fetch_unified_market_data(t_asset, i_choice)
-        close_target = df_target['close'].dropna()
-        start_clean = start_d.strip().lower()
-        end_clean = end_d.strip().lower()
+        df_target = tv.get_hist(symbol=sym, exchange=exch, interval=chosen_interval, n_bars=max_bars)
+    except:
+        print("❌ Network Connection Error: Could not stream dataset pipeline.")
+        return
         
-        if start_clean == 'latest' or end_clean == 'latest':
-            target_df = close_target.iloc[-target_bars_num:]
-        else:
-            try:
-                target_df = close_target.loc[pd.to_datetime(start_clean):pd.to_datetime(end_clean)]
-                if len(target_df) == 0: target_df = close_target.iloc[-target_bars_num:]
-            except:
-                target_df = close_target.iloc[-target_bars_num:]
-                
-        target_bars_num = len(target_df)
-        target_scaled = percentage_return_scale(target_df.tolist())
-        
-        plt.style.use('dark_background')
-        if enable_corr:
-            fig_frac, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 11), sharex=True, gridspec_kw={'height_ratios': [2.5, 1]})
-        else:
-            fig_frac, ax1 = plt.subplots(1, 1, figsize=(16, 8))
-            ax2 = None
-            
-        ax1.plot(target_scaled, color='#00ffcc', linewidth=4, label=f'TARGET: {t_asset} (Baseline)', zorder=5)
-        
-        if f_mode == "Manual Compare":
-            starts = [s.strip() for s in ov_starts.split(',') if s.strip()]
-            ends = [e.strip() for e in ov_ends.split(',') if e.strip()]
-            manual_paths_list = []
-            isolate_clean = iso_path.strip().lower()
-            
-            for idx, (st_val, ed_val) in enumerate(zip(starts, ends)):
-                try:
-                    ov_df = close_target.loc[pd.to_datetime(st_val):pd.to_datetime(ed_val)]
-                    if len(ov_df) == 0: continue
-                    ov_scaled = percentage_return_scale(ov_df.tolist())
-                    manual_paths_list.append(ov_scaled)
-                    
-                    if isolate_clean == 'all' or (isolate_clean.isdigit() and int(isolate_clean) == idx + 1):
-                        ax1.plot(ov_scaled, linewidth=2, linestyle='--', alpha=0.6, label=f'Manual #{idx+1} [{st_val}]')
-                except:
-                    pass
-            
-            if manual_paths_list and isolate_clean in ['all', 'mean']:
-                max_len = max(len(p) for p in manual_paths_list)
-                padded_list = [np.pad(p, (0, max_len - len(p)), 'edge') if len(p) < max_len else p for p in manual_paths_list]
-                manual_matrix = np.vstack(padded_list)
-                m_mean = np.mean(manual_matrix, axis=0) * (1.0 + (vol_boost_pct / 100.0))
-                m_std = np.std(manual_matrix, axis=0) * (1.0 + (vol_boost_pct / 100.0))
-                
-                if std_dev_multiplier > 0:
-                    ax1.fill_between(range(len(m_mean)), m_mean - (m_std * std_dev_multiplier), m_mean + (m_std * std_dev_multiplier), color='#ffff00', alpha=0.12)
-                ax1.plot(m_mean, color='#ffff00', linewidth=4, label='MANUAL COMPOSITE MEAN TRACK', zorder=6)
+    if df_target is None or df_target.empty:
+        print("❌ Data Query Empty.")
+        return
 
-        else:
-            assets_to_scan = list(ticker_map.keys()) if s_pool == "All Assets" else [s_pool]
-            all_discovered_results = []
-            
-            for asset_item in assets_to_scan:
-                df_scan = fetch_unified_market_data(asset_item, i_choice)
-                close_scan = df_scan['close'].dropna()
-                
-                if asset_item == t_asset and (start_clean == 'latest' or end_clean == 'latest'):
-                    history_pool = close_scan.iloc[:-target_bars_num].tolist()
-                    history_dates = close_scan.index[:-target_bars_num]
-                else:
-                    history_pool = close_scan.tolist()
-                    history_dates = close_scan.index
-                    
-                max_search_index = len(history_pool) - (target_bars_num + forecast_bars_num)
-                if max_search_index <= 0: continue
-                
-                parsed_years = [int(y.strip()) for y in spec_years.split(',') if y.strip() and y.lower() != 'all']
-                
-                for i in range(max_search_index):
-                    hist_year = history_dates[i].year
-                    if hist_year == 2026: continue
-                    hist_regime = get_election_regime(hist_year)
-                    
-                    if c_filter != 'All Cycles' and hist_regime != c_filter: continue
-                    if parsed_years and hist_year not in parsed_years: continue
-                    
-                    hist_pattern = history_pool[i : i + target_bars_num]
-                    hist_scaled = percentage_return_scale(hist_pattern)
-                    
-                    mse = float(np.mean((target_scaled - hist_scaled) ** 2))
-                    corr = float(np.corrcoef(target_scaled, hist_scaled)[0, 1])
-                    
-                    all_discovered_results.append({
-                        'asset_name': asset_item, 'start_index': i, 'end_index': i + target_bars_num,
-                        'mse': mse, 'correlation': corr, 'year': hist_year,
-                        'raw_prices': history_pool[i : i + target_bars_num + forecast_bars_num],
-                        'date_str': history_dates[i].strftime('%Y-%m-%d %H:%M')
-                    })
-            
-            if all_discovered_results:
-                match_df = pd.DataFrame(all_discovered_results).sort_values(by='mse', ascending=True)
-                unique_matches, seen_clusters = [], set()
-                for _, row in match_df.iterrows():
-                    s, e, a = row['start_index'], row['end_index'], row['asset_name']
-                    if not any(max(s, es - gap_bars_num) < min(e, ee + gap_bars_num) for es, ee, aa in seen_clusters if aa == a):
-                        unique_matches.append(row)
-                        seen_clusters.add((s, e, a))
-                    if len(unique_matches) >= num_fractals_num: break
-                
-                all_scaled_paths_list = []
-                for row in unique_matches:
-                    raw_full = row['raw_prices']
-                    scaled_full = ((np.array(raw_full) - raw_full[0]) / raw_full[0]) * 100.0 if raw_full[0] != 0 else np.zeros_like(raw_full)
-                    all_scaled_paths_list.append(scaled_full)
-                    
-                mean_path_array = np.mean(np.vstack(all_scaled_paths_list), axis=0) * (1.0 + (vol_boost_pct / 100.0)) if all_scaled_paths_list else None
-                isolate_clean = iso_path.strip().lower()
-                
-                if isolate_clean != 'mean':
-                    for idx, row in enumerate(unique_matches):
-                        if isolate_clean.isdigit() and int(isolate_clean) != idx + 1: continue
-                        raw_full = row['raw_prices']
-                        scaled_full = ((np.array(raw_full) - raw_full[0]) / raw_full[0]) * 100.0
-                        ax1.plot(scaled_full, linestyle='--', alpha=0.5, label=f"#{idx+1} {row['asset_name']} ({row['date_str']})")
-                
-                if mean_path_array is not None and isolate_clean in ['all', 'mean']:
-                    if std_dev_multiplier > 0:
-                        std_path = np.std(np.vstack(all_scaled_paths_list), axis=0) * (1.0 + (vol_boost_pct / 100.0))
-                        ax1.fill_between(range(len(mean_path_array)), mean_path_array - (std_path * std_dev_multiplier), mean_path_array + (std_path * std_dev_multiplier), color='#ffff00', alpha=0.1)
-                    ax1.plot(mean_path_array, color='#ffff00', linewidth=4, label='COMPOSITE FRACTAL MEAN (Excluding 2026)', zorder=6)
-                ax1.axvline(x=target_bars_num - 1, color='#ffffff', linestyle=':', alpha=0.5)
+    df_target.index = pd.to_datetime(df_target.index).tz_localize(None)
+    close_target = df_target['close'].dropna()
 
-                if enable_corr and ax2 is not None and mean_path_array is not None:
-                    r_wave = calculate_rolling_correlation(target_scaled, mean_path_array, c_win)
-                    ax2.plot(r_wave, color='#ffff00', linewidth=2.5, label=f"Rolling {c_win}-Bar Correlation")
-                    ax2.fill_between(range(len(r_wave)), r_wave, 0, where=(np.array(r_wave) >= 0), color='#00ff88', alpha=0.15)
-                    ax2.fill_between(range(len(r_wave)), r_wave, 0, where=(np.array(r_wave) < 0), color='#ff0055', alpha=0.15)
-
-        ax1.axhline(y=0.0, color='#555555', linestyle='-', linewidth=1.2)
-        ax1.set_title("HRF MATRIX ENGINE — UNIFIED CRYPTO CORE CANVAS", color='#ffffff', fontsize=12, fontweight='bold')
-        ax1.set_ylabel("Percentage Performance Shift (%)")
-        ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:+.1f}%'))
-        ax1.legend(loc='upper left', facecolor='#111111', edgecolor='#333333')
-        
-        if enable_corr and ax2 is not None:
-            ax2.axhline(0.0, color='#ffffff', linestyle='-', linewidth=0.8, alpha=0.5)
-            ax2.set_ylim(-1.05, 1.05)
-            ax2.set_ylabel("Correlation R-Scale")
-            ax2.grid(True, color='#222222')
-        
-        plt.tight_layout()
-        st.pyplot(fig_frac)
-    except Exception as e:
-        st.error(f"Ecosystem halted: {e}")
-
-# ==============================================================================
-# ENGINE MODULE 2: CAPITULATION & DAYS SINCE RESET ENGINE
-# ==============================================================================
-else:
-    st.header("⏱️ Path-Dependent Peak-To-Trough Reset Wave")
-    vol_input = st.sidebar.text_input("Volatility Reset Threshold (%)", value="-40.0")
-    pattern_input = st.sidebar.text_input("Candle Sequence Pattern (G/R)", value="RRGG")
+    start_clean = Start_Date.strip().lower()
+    end_clean = End_Date.strip().lower()
     
-    @st.cache_data(show_spinner="🔄 Loading Lifetime Public Archive Pools...")
-    def load_capitulation_data():
-        df_d = fetch_unified_market_data("Bitcoin (BTC)", "1d")
-        df_w = fetch_unified_market_data("Bitcoin (BTC)", "1w")
-        
-        for df in [df_d, df_w]:
-            if df is not None:
-                df['return'] = ((df['close'] - df['open']) / df['open']) * 100.0
-                df['is_midterm'] = (df.index.year % 4 == 2)
-        return df_d, df_w
+    if start_clean == 'latest' or end_clean == 'latest':
+        target_df = close_target.iloc[-target_bars_num:]
+    else:
+        target_df = close_target.loc[pd.to_datetime(start_clean):pd.to_datetime(end_clean)]
+        if len(target_df) == 0:
+            print("❌ Selection Range Exception: Target range contains 0 ticks.")
+            return
+        target_bars_num = len(target_df)
 
-    try:
-        df_daily_raw, df_weekly = load_capitulation_data()
-        df_daily = df_daily_raw.copy()
-        thresh = float(vol_input)
-        days_since_tracker = []
-        current_accumulator = 0
-        
-        if thresh < 0:
-            running_peak = df_daily['high'].iloc[0]
-            for idx in range(len(df_daily)):
-                current_high = df_daily['high'].iloc[idx]
-                current_low = df_daily['low'].iloc[idx]
-                if current_high > running_peak: running_peak = current_high
-                drawdown_pct = ((current_low - running_peak) / running_peak) * 100.0
-                if drawdown_pct <= thresh:
-                    days_since_tracker.append(0)
-                    current_accumulator = 0
-                    running_peak = current_high
-                else:
-                    current_accumulator += 1
-                    days_since_tracker.append(current_accumulator)
-        else:
-            running_trough = df_daily['low'].iloc[0]
-            for idx in range(len(df_daily)):
-                current_high = df_daily['high'].iloc[idx]
-                current_low = df_daily['low'].iloc[idx]
-                if current_low < running_trough: running_trough = current_low
-                expansion_pct = ((current_high - running_trough) / running_trough) * 100.0
-                if expansion_pct >= thresh:
-                    days_since_tracker.append(0)
-                    current_accumulator = 0
-                    running_trough = current_low
-                else:
-                    current_accumulator += 1
-                    days_since_tracker.append(current_accumulator)
-        
-        current_live_gap = days_since_tracker[-1]
-        clean_pattern = pattern_input.strip().upper()
-        candle_string_sequence = "".join(['G' if r >= 0 else 'R' for r in df_daily['return'].tolist()])
-        match_indices = [i + len(clean_pattern) for i in range(len(candle_string_sequence) - len(clean_pattern)) if candle_string_sequence[i : i + len(clean_pattern)] == clean_pattern]
-        
-        plt.style.use('dark_background')
-        fig, (ax1, ax3) = plt.subplots(1, 2, figsize=(16, 6))
-        
-        ax1.hist(df_daily['return'].dropna().values, bins=100, range=(-15, 15), color='#8a2be2', alpha=0.6, label='Daily Lifetime')
-        ax1.set_title("HISTOGRAM 1: TOTAL DAILY RETURN FREQUENCY", fontweight='bold', fontsize=10)
-        
-        ax3.plot(df_daily.index, days_since_tracker, color='#00ffcc', linewidth=1.2, label='Days Since')
-        ax3.fill_between(df_daily.index, 0, days_since_tracker, color='#00ffcc', alpha=0.06)
-        ax3.set_title("CHART 2: STRUCTURAL RESETS TIMELINE WAVE", fontweight='bold', fontsize=10)
-        
-        plt.tight_layout(pad=3.0)
-        st.pyplot(fig)
-        
-        st.subheader("📊 Performance Summary Matrix")
-        metrics_data = {
-            "Timeframe Segment": ["Daily Changes", "Weekly Changes"],
-            "Lifetime History Average": [f"{df_daily['return'].mean():+.4f}%", f"{df_weekly['return'].mean():+.4f}%" if df_weekly is not None else "N/A"],
-            "US Midterm Cycles Only": [f"{df_daily[df_daily['is_midterm']]['return'].mean():+.4f}%", f"{df_weekly[df_weekly['is_midterm']]['return'].mean():+.4f}%" if df_weekly is not None else "N/A"]
-        }
-        st.table(pd.DataFrame(metrics_data))
-        
-        col1, col2 = st.columns(2)
-        col1.metric("Current Days Stretched Under Matrix", f"{current_live_gap} Days")
-        col2.metric(f"Historical '{clean_pattern}' Frequency Discoveries", f"{len(match_indices)} Matches")
-    except Exception as ex:
-        st.error(f"Execution Error: {ex}")
+    target_scaled = percentage_return_scale(target_df.tolist())
 
-st.divider()
-st.markdown("<p style='text-align: center; color: #555555;'>--- Model By HRF ---</p>", unsafe_allow_html=True)
+    plt.style.use('dark_background')
+    plt.figure(figsize=(16, 9))
+    plt.plot(target_scaled, color='#00ffcc', linewidth=4, label=f'TARGET: {Target_Asset} (Baseline)', zorder=5)
+
+    # --- SANDBOX MODE CORE RUNTIME ---
+    if Mode == "Manual Compare":
+        print("⚡ [SANDBOX MODE]: Extracting and Stacking Custom History Overlays...")
+        starts = [s.strip() for s in Overlay_Starts.split(',') if s.strip()]
+        ends = [e.strip() for e in Overlay_Ends.split(',') if e.strip()]
+        
+        if len(starts) != len(ends):
+            print("❌ Matrix Misalignment: Start entries must match total end entries.")
+            return
+            
+        manual_paths_list = []
+        cmap = plt.colormaps.get_cmap('spring')
+        color_steps = np.linspace(0, 0.7, max(len(starts), 2))
+
+        for idx, (st, ed) in enumerate(zip(starts, ends)):
+            try:
+                ov_df = close_target.loc[pd.to_datetime(st):pd.to_datetime(ed)]
+                if len(ov_df) == 0: continue
+                ov_scaled = percentage_return_scale(ov_df.tolist())
+                manual_paths_list.append(ov_scaled)
+                
+                isolate_clean = Isolate_Path.strip().lower()
+                if isolate_clean == 'all' or (isolate_clean.isdigit() and int(isolate_clean) == idx + 1):
+                    plt.plot(ov_scaled, color=cmap(color_steps[idx]), linewidth=2, linestyle='--', alpha=0.6, label=f'Manual #{idx+1} [{st}]')
+            except:
+                continue
+
+        if manual_paths_list and Isolate_Path.strip().lower() in ['all', 'mean']:
+            max_len = max(len(p) for p in manual_paths_list)
+            padded_list = [np.pad(p, (0, max_len - len(p)), 'edge') if len(p) < max_len else p for p in manual_paths_list]
+            manual_matrix = np.vstack(padded_list)
+            m_mean = np.mean(manual_matrix, axis=0) * (1.0 + (vol_boost_pct / 100.0))
+            m_std = np.std(manual_matrix, axis=0) * (1.0 + (vol_boost_pct / 100.0))
+            
+            if std_dev_multiplier > 0:
+                plt.fill_between(range(len(m_mean)), m_mean - (m_std * std_dev_multiplier), m_mean + (m_std * std_dev_multiplier), color='#ffff00', alpha=0.12, label='Manual Stacking Deviation Channel')
+            plt.plot(m_mean, color='#ffff00', linewidth=4, label='MANUAL COMPOSITE MEAN TRACK', zorder=6)
+
+    # --- CROSS-ASSET MATH ENGINE SCANNERS ---
+    else:
+        if not Scan_Assets:
+            print("⚠️ User Matrix Alert: Please select at least one historical database tracker from the multi-asset list.")
+            return
+            
+        print(f"🎯 [ALGO SCAN]: Scanning across your selected assets: {list(Scan_Assets)}...")
+        all_discovered_results = []
+        
+        include_years = [int(y.strip()) for y in Specific_Years.split(',') if y.strip() and y.lower() != 'all']
+        exclude_years = [int(y.strip()) for y in Exclude_Years.split(',') if y.strip() and y.lower() != 'none']
+
+        for asset_item in Scan_Assets:
+            s_sym, s_exch = ticker_map[asset_item]
+            try:
+                df_scan = tv.get_hist(symbol=s_sym, exchange=s_exch, interval=chosen_interval, n_bars=max_bars)
+                if df_scan is None or df_scan.empty: continue
+                df_scan.index = pd.to_datetime(df_scan.index).tz_localize(None)
+                close_scan = df_scan['close'].dropna()
+            except:
+                continue
+
+            if asset_item == Target_Asset and (start_clean == 'latest' or end_clean == 'latest'):
+                history_pool = close_scan.iloc[:-target_bars_num].tolist()
+                history_dates = close_scan.index[:-target_bars_num]
+            else:
+                history_pool = close_scan.tolist()
+                history_dates = close_scan.index
+                
+            max_search_index = len(history_pool) - (target_bars_num + forecast_bars_num)
+            if max_search_index <= 0: continue
+
+            for i in range(max_search_index):
+                hist_year = history_dates[i].year
+                hist_regime = get_election_regime(hist_year)
+                
+                if Cycle_Filter != 'All Cycles' and hist_regime != Cycle_Filter: continue
+                if include_years and hist_year not in include_years: continue
+                if hist_year in exclude_years or hist_year == 2026: continue
+                
+                hist_pattern = history_pool[i : i + target_bars_num]
+                hist_scaled = percentage_return_scale(hist_pattern)
+                
+                # Metric calculation nodes
+                mse = float(np.mean((target_scaled - hist_scaled) ** 2))
+                corr_matrix = np.corrcoef(target_scaled, hist_scaled)
+                corr = float(corr_matrix[0, 1]) if not np.isnan(corr_matrix[0, 1]) else -1.0
+                
+                # Filter validation check boundaries
+                if corr < min_corr_val or mse > max_mse_val:
+                    continue
+                    
+                dtw_dist, _ = fastdtw(target_scaled, hist_scaled, radius=2, dist=2)
+                
+                all_discovered_results.append({
+                    'asset_name': asset_item, 'start_index': i, 'end_index': i + target_bars_num,
+                    'mse': mse, 'correlation': corr, 'dtw': float(dtw_dist), 'year': hist_year,
+                    'raw_prices': history_pool[i : i + target_bars_num + forecast_bars_num],
+                    'date_str': history_dates[i].strftime('%Y-%m-%d')
+                })
+
+        if not all_discovered_results:
+            print("❌ Zero matches satisfied the requested hard thresholds.")
+            return
+            
+        raw_match_df = pd.DataFrame(all_discovered_results)
+        
+        # Calculate scores for sorting configurations
+        max_mse = raw_match_df['mse'].max() if raw_match_df['mse'].max() != 0 else 1
+        max_dtw = raw_match_df['dtw'].max() if raw_match_df['dtw'].max() != 0 else 1
+        raw_match_df['omni_score'] = (
+            (raw_match_df['correlation'] + 1) / 2 * 0.40 + 
+            (1 - (raw_match_df['mse'] / max_mse)) * 0.30 + 
+            (1 - (raw_match_df['dtw'] / max_dtw)) * 0.30
+        )
+        
+        # --- FLEXIBLE PRIORITY SORT ENGINE ---
+        if Sort_Priority == 'Highest Correlation':
+            sorted_match_df = raw_match_df.sort_values(by='correlation', ascending=False)
+        elif Sort_Priority == 'Lowest MSE':
+            sorted_match_df = raw_match_df.sort_values(by='mse', ascending=True)
+        else: # Omni-Score Default Option Block
+            sorted_match_df = raw_match_df.sort_values(by='omni_score', ascending=False)
+        
+        # Cluster distance mapping loop
+        unique_matches = []
+        seen_clusters = set()
+        for _, row in sorted_match_df.iterrows():
+            s, e, a = row['start_index'], row['end_index'], row['asset_name']
+            if not any(max(s, es - gap_bars_num) < min(e, ee + gap_bars_num) for es, ee, aa in seen_clusters if aa == a):
+                unique_matches.append(row)
+                seen_clusters.add((s, e, a))
+            if len(unique_matches) >= num_fractals_num:
+                break
+
+        # Generate structural rolling statistics maps
+        all_scaled_paths_list = []
+        for row in unique_matches:
+            raw_full = row['raw_prices']
+            base_p = raw_full[0]
+            scaled_full = ((np.array(raw_full) - base_p) / base_p) * 100.0 if base_p != 0 else np.zeros_like(raw_full)
+            all_scaled_paths_list.append(scaled_full)
+
+        mean_path_array = None
+        if all_scaled_paths_list:
+            matrix_data = np.vstack(all_scaled_paths_list)
+            mean_path_array = np.mean(matrix_data, axis=0) * (1.0 + (vol_boost_pct / 100.0))
+            if std_dev_multiplier > 0:
+                std_path = np.std(matrix_data, axis=0) * (1.0 + (vol_boost_pct / 100.0))
+                plt.fill_between(range(len(mean_path_array)), mean_path_array - (std_path * std_dev_multiplier), mean_path_array + (std_path * std_dev_multiplier), color='#ffff00', alpha=0.12, label='Cross-Asset Variance Cloud')
+
+        # Visualizer core presentation pipeline
+        isolate_clean = Isolate_Path.strip().lower()
+        cmap = plt.colormaps.get_cmap('plasma')
+        color_steps = np.linspace(0, 0.8, max(len(unique_matches), 2))
+        
+        if isolate_clean != 'mean':
+            for idx, row in enumerate(unique_matches):
+                if isolate_clean.isdigit() and int(isolate_clean) != idx + 1: continue
+                raw_full = row['raw_prices']
+                base_p = raw_full[0]
+                scaled_full = ((np.array(raw_full) - base_p) / base_p) * 100.0
+                lbl = f"#{idx+1} {row['asset_name']} ({row['date_str']}) [Corr: {row['correlation']:.2f} | MSE: {row['mse']:.4f}]"
+                plt.plot(scaled_full, color=cmap(color_steps[idx % len(color_steps)]), linestyle='--', alpha=0.6, label=lbl)
+
+        if mean_path_array is not None and isolate_clean in ['all', 'mean']:
+            plt.plot(mean_path_array, color='#ffff00', linewidth=4, label='COMPOSITE FRACTAL MEAN BASELINE', zorder=6)
+            
+        plt.axvline(x=target_bars_num - 1, color='#ffffff', linestyle=':', alpha=0.5, linewidth=1.5)
+
+    # UI Presentation Parameters
+    plt.axhline(y=0.0, color='#555555', linestyle='-', linewidth=1.2)
+    plt.title(f"HRF QUANT PLATFORM — MASTER TERMINAL V4 ENGINE", color='#ffffff', fontsize=13, fontweight='bold', pad=15)
+    plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:+.1f}%'))
+    plt.ylabel("Normalized Return Performance Scale", color='#ffffff', fontsize=11)
+    plt.xlabel("Timeline Index Sequence (Bars)", color='#ffffff', fontsize=11)
+    plt.grid(True, color='#222222', linestyle='-')
+    plt.legend(loc='upper left', facecolor='#111111', edgecolor='#333333')
+    plt.tight_layout()
+    plt.show()
+    print("\n--- Model By HRF ---")
+
+# --- CUSTOMIZED USER FORM LAYOUT BUILDERS ---
+assets_list = list(ticker_map.keys())
+
+interact_manual(
+    run_hrf_dashboard,
+    Target_Asset=widgets.Dropdown(options=assets_list, value='Bitcoin (BTC)', description='Target Asset:'),
+    Scan_Assets=widgets.SelectMultiple(options=assets_list, value=['Bitcoin (BTC)'], description='Scan Pools:', rows=6),
+    Interval_Choice=['1M', '1w', '1d', '1h', '15m', '5m'],
+    Mode=['Calculate Fractals', 'Manual Compare'],
+    Sort_Priority=['Highest Correlation', 'Lowest MSE', 'Omni-Score Combination'],
+    Min_Correlation=widgets.FloatSlider(value=-1.0, min=-1.0, max=1.0, step=0.05, description='Min Corr:'),
+    Max_MSE=widgets.FloatSlider(value=1000.0, min=0.1, max=1000.0, step=10.0, description='Max MSE:'),
+    Start_Date=widgets.Text(value='latest', description='Start Date:'),
+    End_Date=widgets.Text(value='latest', description='End Date:'),
+    Overlay_Starts=widgets.Text(value='2020-03-01, 2022-11-01', description='Overlay Starts:'),
+    Overlay_Ends=widgets.Text(value='2020-05-01, 2023-01-01', description='Overlay Ends:'),
+    Target_Bars=widgets.Text(value='30', description='Scan Bars:'),
+    Forecast_Bars=widgets.Text(value='15', description='Forecast Bars:'),
+    Number_Of_Fractals=widgets.Text(value='5', description='Num Paths:'),
+    Isolate_Path=widgets.Text(value='all', description='Isolate (#):'),
+    Cycle_Filter=['All Cycles', 'Election Year', 'Post-Election', 'Midterm Year', 'Pre-Election'],
+    Specific_Years=widgets.Text(value='all', description='Years Only:'),
+    Exclude_Years=widgets.Text(value='none', description='Exclude Years:'),
+    Gap_Bars=widgets.Text(value='20', description='Gap Bars:'),
+    Vol_Boost=widgets.Text(value='0', description='Vol Boost (%):'),
+    Std_Dev_Bands=widgets.Text(value='1.0', description='Std Dev (+-):')
+);
