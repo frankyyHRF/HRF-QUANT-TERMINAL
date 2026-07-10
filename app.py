@@ -459,5 +459,3 @@ else:
     except Exception as ex:
         st.error(f"Execution Error: {ex}")
 
-st.divider()
-st.markdown("<p style='text-align: center; color: #555555;'>--- Model By HRF ---</p>", unsafe_allow_html=True)
