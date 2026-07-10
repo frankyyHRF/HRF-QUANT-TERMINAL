@@ -19,9 +19,39 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🏛️ HRF QUANT MASTER PLATFORM V4.0")
-st.caption("TradingView Market Core Engine — Model By HRF")
+st.title("🏛️ HRF QUANT MASTER PLATFORM V4.5")
+st.caption("Hybrid Engine: Local Drive Streams & TradingView Fallback — Model By HRF")
 st.divider()
+
+# --- GOOGLE DRIVE / LOCAL FILE INGESTION LAYER ---
+st.sidebar.markdown("### 💾 Core Data Ingestion Pipeline")
+uploaded_file = st.sidebar.file_uploader("Upload Google Drive Export (.csv)", type=["csv"])
+
+# Read and cache the uploaded dataset dynamically
+@st.cache_data(show_spinner=False)
+def load_drive_dataset(file_obj):
+    if file_obj is None:
+        return None
+    try:
+        # Load file and clean up column text spaces/casing
+        df = pd.read_csv(file_obj)
+        df.columns = [c.strip().lower() for c in df.columns]
+        
+        # Look for time/date coordinates
+        date_col = next((c for c in df.columns if 'time' in c or 'date' in c), None)
+        if date_col:
+            df[date_col] = pd.to_datetime(df[date_col])
+            df.set_index(date_col, inplace=True)
+            df.sort_index(inplace=True)
+        return df
+    except Exception as e:
+        st.sidebar.error(f"File parsing mismatch: {e}")
+        return None
+
+drive_df = load_drive_dataset(uploaded_file)
+
+if drive_df is not None:
+    st.sidebar.success("✅ Drive Engine Live: Crypto arrays loaded successfully.")
 
 # --- NAVIGATION ---
 app_mode = st.sidebar.selectbox("🚀 Choose Analysis Core Engine", ["Algorithmic Fractal Scan", "Structural Capitulation Wave"])
@@ -31,6 +61,7 @@ ticker_map = {
     'Bitcoin (BTC)': ('BTCUSD', 'BINANCE'),
     'Ethereum (ETH)': ('ETHUSD', 'BINANCE'),
     'S&P 500 (SPX)': ('SPX', 'SP'),
+    'Nasdaq 100 (QQQ)': ('QQQ', 'NASDAQ'),
     'Binance Coin (BNB)': ('BNBUSD', 'BINANCE'),
     'Solana (SOL)': ('SOLUSD', 'BINANCE'),
     'Cardano (ADA)': ('ADAUSD', 'BINANCE'),
@@ -56,33 +87,50 @@ def get_election_regime(year):
     else: return 'Pre-Election'
 
 # ==============================================================================
-# RESTORED TRADINGVIEW DATA PIPELINE
+# HYBRID ENGINE DATA PIPELINE (DRIVE + TRADINGVIEW FALLBACK)
 # ==============================================================================
 @st.cache_data(show_spinner=False)
 def fetch_legacy_market_data(asset_name, interval_str):
-    symbol, exchange = ticker_map.get(asset_name, ('BTCUSD', 'BINANCE'))
+    # CRITICAL FALLBACK CHECK: If it's not Crypto (e.g., SPX, QQQ), bypass Drive completely
+    is_crypto = "SPX" not in asset_name and "QQQ" not in asset_name
     
-    # Map the interface options back to TradingView Intervals
+    if is_crypto and drive_df is not None:
+        try:
+            # Look for columns that match the target asset name
+            clean_name = asset_name.lower()
+            matching_col = next((c for c in drive_df.columns if clean_name in c or c in clean_name), None)
+            
+            # If no direct asset match, look for generic price markers ('close', 'price') inside your file
+            if not matching_col:
+                matching_col = next((c for c in drive_df.columns if 'close' in c or 'price' in c), None)
+                
+            if matching_col:
+                # Rebuild standard tracking structure from your drive row data
+                df_slice = drive_df[[matching_col]].dropna().copy()
+                df_slice.columns = ['close']
+                # Reconstruct mock columns if missing for calculation compatibility
+                df_slice['open'] = df_slice['close']
+                df_slice['high'] = df_slice['close']
+                df_slice['low'] = df_slice['close']
+                df_slice['volume'] = 0
+                return df_slice
+        except:
+            pass # Fail smoothly and drop into TradingView fallback if file structure mismatches
+
+    # TradingView Native Engine Core Loop
+    symbol, exchange = ticker_map.get(asset_name, ('BTCUSD', 'BINANCE'))
     interval_dict = {
-        '1M': Interval.in_monthly,
-        '1w': Interval.in_weekly,
-        '1d': Interval.in_daily,
-        '4h': Interval.in_4_hour,
-        '1h': Interval.in_1_hour,
-        '15m': Interval.in_15_minute,
-        '5m': Interval.in_5_minute,
-        '1m': Interval.in_1_minute
+        '1M': Interval.in_monthly, '1w': Interval.in_weekly, '1d': Interval.in_daily,
+        '4h': Interval.in_4_hour, '1h': Interval.in_1_hour, '15m': Interval.in_15_minute,
+        '5m': Interval.in_5_minute, '1m': Interval.in_1_minute
     }
     tv_interval = interval_dict.get(interval_str, Interval.in_daily)
         
     try:
         tv = TvDatafeed()
-        # Request a highly optimized row count for calculations
         df = tv.get_hist(symbol=symbol, exchange=exchange, interval=tv_interval, n_bars=4000)
         if df is None or df.empty: return None
-        
         df.index.name = 'time'
-        # Standardize naming cases for model execution
         df.rename(columns={'open': 'open', 'high': 'high', 'low': 'low', 'close': 'close', 'volume': 'volume'}, inplace=True)
         return df[['open', 'high', 'low', 'close', 'volume']]
     except:
@@ -105,7 +153,7 @@ def calculate_rolling_correlation(series_a, series_b, lookback_window):
 # MAIN CORE: ENGINE MODULE 1 (FRACTAL SCANNER)
 # ==============================================================================
 if app_mode == "Algorithmic Fractal Scan":
-    st.header("🎯 TradingView Core Fractal Scanner")
+    st.header("🎯 System Core Fractal Scanner")
     
     t_asset = st.sidebar.selectbox("Baseline Target Asset", list(ticker_map.keys()), index=0)
     s_pool = st.sidebar.selectbox("Scan Matching Pool Range", ["All Assets"] + list(ticker_map.keys()), index=0)
@@ -148,7 +196,7 @@ if app_mode == "Algorithmic Fractal Scan":
     try:
         df_target = fetch_legacy_market_data(t_asset, i_choice)
         if df_target is None or df_target.empty:
-            st.error("❌ Data download error from TradingView backend systems. Retry executing pipeline.")
+            st.error("❌ Data download error from baseline systems. Verify file configurations or tickers.")
             st.stop()
             
         close_target = df_target['close'].dropna()
@@ -232,9 +280,13 @@ if app_mode == "Algorithmic Fractal Scan":
                 parsed_years = [int(y.strip()) for y in spec_years.split(',') if y.strip() and y.lower() != 'all']
                 
                 for i in range(max_search_index):
-                    hist_year = history_dates[i].year
-                    if hist_year == 2026: continue
-                    hist_regime = get_election_regime(hist_year)
+                    try:
+                        hist_year = history_dates[i].year
+                        if hist_year == 2026: continue
+                        hist_regime = get_election_regime(hist_year)
+                    except:
+                        hist_year = 0
+                        hist_regime = 'All Cycles'
                     
                     if c_filter != 'All Cycles' and hist_regime != c_filter: continue
                     if parsed_years and hist_year not in parsed_years: continue
@@ -243,13 +295,18 @@ if app_mode == "Algorithmic Fractal Scan":
                     hist_scaled = percentage_return_scale(hist_pattern)
                     
                     mse = float(np.mean((target_scaled - hist_scaled) ** 2))
-                    corr = float(np.corrcoef(target_scaled, hist_scaled)[0, 1])
+                    corr = float(np.corrcoef(target_scaled, hist_scaled)[0, 1]) if len(target_scaled) > 1 else 0.0
                     
+                    try:
+                        date_label = history_dates[i].strftime('%Y-%m-%d %H:%M')
+                    except:
+                        date_label = f"Bar idx {i}"
+                        
                     all_discovered_results.append({
                         'asset_name': asset_item, 'start_index': i, 'end_index': i + target_bars_num,
                         'mse': mse, 'correlation': corr, 'year': hist_year,
                         'raw_prices': history_pool[i : i + target_bars_num + forecast_bars_num],
-                        'date_str': history_dates[i].strftime('%Y-%m-%d %H:%M')
+                        'date_str': date_label
                     })
             
             if all_discovered_results:
@@ -324,7 +381,10 @@ else:
         for df in [df_d, df_w]:
             if df is not None:
                 df['return'] = ((df['close'] - df['open']) / df['open']) * 100.0
-                df['is_midterm'] = (df.index.year % 4 == 2)
+                try:
+                    df['is_midterm'] = (df.index.year % 4 == 2)
+                except:
+                    df['is_midterm'] = False
         return df_d, df_w
 
     try:
