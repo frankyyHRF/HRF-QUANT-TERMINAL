@@ -21,62 +21,31 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏛️ HRF QUANT MASTER PLATFORM V4.7")
-st.caption("Google Drive Folder Stream Engine — Model By HRF")
+st.caption("Google Drive Stream Integration — Model By HRF")
 st.divider()
 
-# --- GOOGLE DRIVE STREAMING PIPELINE LAYER ---
-st.sidebar.markdown("### 💾 Core Data Ingestion Pipeline")
-drive_folder_url = st.sidebar.text_input("Paste Shared Google Drive Folder Link:", value="")
+# --- GOOGLE DRIVE DATA INTERCEPTOR FEATURE ---
+st.sidebar.markdown("### 🔑 Link Remote Dataset")
+drive_url_input = st.sidebar.text_input("Paste Shared Google Drive CSV Link:", value="")
 
-@st.cache_data(show_spinner="🔄 Streaming database framework from Google Drive...")
-def stream_drive_folder(url):
-    if not url:
+@st.cache_data(show_spinner="🔄 Fetching direct matrix from Google Drive...")
+def parse_google_drive_stream(url_string):
+    if not url_string:
         return None
     try:
-        # Extract folder ID from shared web link using regex matches
-        match = re.search(r"folders/([a-zA-Z0-9-_]+)", url)
-        if not match:
-            st.sidebar.error("Invalid Google Drive folder link format.")
-            return None
-        folder_id = match.group(1)
-        
-        # Query public export endpoint to pull raw directory layout index
-        export_url = f"https://docs.google.com/spreadsheets/d/{folder_id}/export?format=csv"
-        # Alternate API approach for general parsing fallback
-        query_url = f"https://drive.google.com/uc?export=download&id={folder_id}"
-        
-        # Connect to individual asset targets
-        st.sidebar.info("Connecting directly to database stream index...")
-        
-        # For security, let's allow user to paste specific file links or parse assets natively
-        # Rebuilding dictionary database mapping
-        combined_df = pd.DataFrame()
-        return combined_df
-    except Exception as e:
-        st.sidebar.error(f"Network stream connection error: {e}")
-        return None
-
-# For security and stability on heavy mobile files, let's provide individual asset overrides
-st.sidebar.markdown("### 🔑 Target Asset Token Links")
-btc_file_id = st.sidebar.text_input("BTC File ID / Link (Optional)", value="")
-eth_file_id = st.sidebar.text_input("ETH File ID / Link (Optional)", value="")
-
-@st.cache_data(show_spinner=False)
-def parse_direct_drive_file(link_or_id):
-    if not link_or_id:
-        return None
-    try:
-        # Extract clean file ID from anywhere in the string
-        file_id = link_or_id
-        if "id=" in link_or_id:
-            file_id = link_or_id.split("id=")[1].split("&")[0]
-        elif "file/d/" in link_or_id:
-            file_id = link_or_id.split("file/d/")[1].split("/")[0]
+        # Extract file ID from standard sharing link structure
+        if "id=" in url_string:
+            file_id = url_string.split("id=")[1].split("&")[0]
+        elif "file/d/" in url_string:
+            file_id = url_string.split("file/d/")[1].split("/")[0]
+        else:
+            file_id = url_string
             
-        download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
-        df = pd.read_csv(download_url)
-        df.columns = [c.strip().lower() for c in df.columns]
+        direct_download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+        df = pd.read_csv(direct_download_url)
         
+        # Clean columns to fit your exact model logic downstream
+        df.columns = [c.strip().lower() for c in df.columns]
         date_col = next((c for c in df.columns if 'time' in c or 'date' in c), None)
         if date_col:
             df[date_col] = pd.to_datetime(df[date_col])
@@ -92,17 +61,13 @@ def parse_direct_drive_file(link_or_id):
             df['volume'] = 0
             return df
     except Exception as e:
-        st.sidebar.error(f"Error parsing file: {e}")
+        st.sidebar.error(f"Stream error: {e}")
     return None
 
-# Process individual target token pipelines seamlessly
-btc_data = parse_direct_drive_file(btc_file_id)
-eth_data = parse_direct_drive_file(eth_file_id)
-
-if btc_data is not None:
-    st.sidebar.success("✅ BTC Matrix Link Active")
-if eth_data is not None:
-    st.sidebar.success("✅ ETH Matrix Link Active")
+# Convert the live link to data if it exists
+remote_drive_data = parse_google_drive_stream(drive_url_input)
+if remote_drive_data is not None:
+    st.sidebar.success("✅ Remote Stream Database Online")
 
 # --- NAVIGATION ---
 app_mode = st.sidebar.selectbox("🚀 Choose Analysis Core Engine", ["Algorithmic Fractal Scan", "Structural Capitulation Wave"])
@@ -122,12 +87,11 @@ def percentage_return_scale(series):
 
 # --- HYBRID BACKEND OVERRIDE INTERCEPTOR ---
 def fetch_legacy_market_data(asset_name, interval_str):
-    if asset_name == 'Bitcoin (BTC)' and btc_data is not None:
-        return btc_data
-    if asset_name == 'Ethereum (ETH)' and eth_data is not None:
-        return eth_data
+    # If a Google Drive link is pasted, it completely overrides the data source instantly
+    if remote_drive_data is not None:
+        return remote_drive_data
         
-    # Standard TradingView Fallback Protocol
+    # Standard TradingView Fallback Protocol (Kept exactly identical)
     symbol, exchange = ticker_map.get(asset_name, ('BTCUSD', 'BINANCE'))
     interval_dict = {'1M': Interval.in_monthly, '1w': Interval.in_weekly, '1d': Interval.in_daily}
     tv_interval = interval_dict.get(interval_str, Interval.in_daily)
@@ -204,4 +168,3 @@ else:
 
 st.divider()
 st.markdown("<p style='text-align: center; color: #555555;'>--- Model By HRF ---</p>", unsafe_allow_html=True)
-
