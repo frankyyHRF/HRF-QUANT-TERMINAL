@@ -2,13 +2,12 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import zipfile
-import io
 from tvDatafeed import TvDatafeed, Interval
 
 # --- UNIFIED SYSTEM INITIALIZATION ---
 st.set_page_config(page_title="HRF QUANT PLATFORM", layout="wide")
 
+# Inject deep dark-mode styling variables for mobile UI clarity
 st.markdown("""
     <style>
     .reportview-container { background: #0d0d11; }
@@ -20,104 +19,18 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🏛️ HRF QUANT MASTER PLATFORM V4.6")
-st.caption("Zip Archive Multi-Asset Aggregator Engine — Model By HRF")
+st.title("🏛️ HRF QUANT MASTER PLATFORM V4.0")
+st.caption("TradingView Market Core Engine — Model By HRF")
 st.divider()
 
-# --- GOOGLE DRIVE / ZIP DATA INGESTION LAYER ---
-st.sidebar.markdown("### 💾 Core Data Ingestion Pipeline")
-uploaded_file = st.sidebar.file_uploader("Upload CSV or Combined .ZIP Archive", type=["csv", "zip"])
-
-# New feature: Remote streaming link input box placed directly in the ingestion flow
-drive_url_input = st.sidebar.text_input("Or Paste Shared Google Drive CSV Link:", value="")
-
-# Read, merge, and cache multiple CSVs from a single ZIP file dynamically
-@st.cache_data(show_spinner=False)
-def load_drive_dataset(file_obj, url_string=None):
-    # Process remote link if provided and no manual file is uploaded
-    if file_obj is None and url_string:
-        try:
-            if "id=" in url_string:
-                file_id = url_string.split("id=")[1].split("&")[0]
-            elif "file/d/" in url_string:
-                file_id = url_string.split("file/d/")[1].split("/")[0]
-            else:
-                file_id = url_string
-            
-            direct_download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
-            df = pd.read_csv(direct_download_url)
-            df.columns = [c.strip().lower() for c in df.columns]
-            date_col = next((c for c in df.columns if 'time' in c or 'date' in c), None)
-            if date_col:
-                df[date_col] = pd.to_datetime(df[date_col])
-                df.set_index(date_col, inplace=True)
-                df.sort_index(inplace=True)
-            return df
-        except Exception as e:
-            st.sidebar.error(f"Google Drive Link Stream Error: {e}")
-            return None
-
-    if file_obj is None:
-        return None
-    try:
-        # Scenario A: User uploaded a combined ZIP file
-        if file_obj.name.endswith('.zip'):
-            combined_df = pd.DataFrame()
-            with zipfile.ZipFile(file_obj) as z:
-                for file_name in z.namelist():
-                    if file_name.endswith('.csv') and not file_name.startswith('__MACOSX'):
-                        with z.open(file_name) as f:
-                            df = pd.read_csv(f)
-                            df.columns = [c.strip().lower() for c in df.columns]
-                            
-                            # Clean up time/date indexing
-                            date_col = next((c for c in df.columns if 'time' in c or 'date' in c), None)
-                            if date_col:
-                                df[date_col] = pd.to_datetime(df[date_col])
-                                df.set_index(date_col, inplace=True)
-                                
-                            # Identify the price column
-                            close_col = next((c for c in df.columns if 'close' in c or 'price' in c), None)
-                            if close_col:
-                                # Clean asset label from file name (e.g., "BTCUSDT_1d.csv" -> "btcusdt")
-                                asset_label = file_name.lower().split('.')[0].split('_')[0]
-                                temp_series = df[[close_col]].rename(columns={close_col: asset_label})
-                                if combined_df.empty:
-                                    combined_df = temp_series
-                                else:
-                                    combined_df = combined_df.join(temp_series, how='outer')
-            if not combined_df.empty:
-                combined_df.sort_index(inplace=True)
-                return combined_df
-                
-        # Scenario B: User uploaded a single standalone CSV file
-        else:
-            df = pd.read_csv(file_obj)
-            df.columns = [c.strip().lower() for c in df.columns]
-            date_col = next((c for c in df.columns if 'time' in c or 'date' in c), None)
-            if date_col:
-                df[date_col] = pd.to_datetime(df[date_col])
-                df.set_index(date_col, inplace=True)
-                df.sort_index(inplace=True)
-            return df
-    except Exception as e:
-        st.sidebar.error(f"Engine parsing error: {e}")
-        return None
-
-# Combined link + file integration pass
-drive_df = load_drive_dataset(uploaded_file, drive_url_input)
-
-if drive_df is not None:
-    st.sidebar.success(f"✅ Archive Loaded! Discovered columns: {', '.join(list(drive_df.columns)[:5])}...")
-
-# --- NAVIGATION & TICKER MAP ---
+# --- NAVIGATION ---
 app_mode = st.sidebar.selectbox("🚀 Choose Analysis Core Engine", ["Algorithmic Fractal Scan", "Structural Capitulation Wave"])
 
+# Expanded TradingView Ticker Mapping Range
 ticker_map = {
     'Bitcoin (BTC)': ('BTCUSD', 'BINANCE'),
     'Ethereum (ETH)': ('ETHUSD', 'BINANCE'),
     'S&P 500 (SPX)': ('SPX', 'SP'),
-    'Nasdaq 100 (QQQ)': ('QQQ', 'NASDAQ'),
     'Binance Coin (BNB)': ('BNBUSD', 'BINANCE'),
     'Solana (SOL)': ('SOLUSD', 'BINANCE'),
     'Cardano (ADA)': ('ADAUSD', 'BINANCE'),
@@ -125,7 +38,9 @@ ticker_map = {
     'TRON (TRX)': ('TRXUSD', 'BINANCE'),
     'Bitcoin Cash (BCH)': ('BCHUSD', 'BINANCE'),
     'Litecoin (LTC)': ('LTCUSD', 'BINANCE'),
-    'Bittensor (TAO)': ('TAOUSD', 'BINANCE')
+    'Bittensor (TAO)': ('TAOUSD', 'BINANCE'),
+    'Bitget Token (BGB)': ('BGBUSDT', 'BITGET'),
+    'Internet Computer (ICP)': ('ICPUSD', 'BINANCE')
 }
 
 def percentage_return_scale(series):
@@ -140,57 +55,78 @@ def get_election_regime(year):
     elif year % 4 == 2: return 'Midterm Year'
     else: return 'Pre-Election'
 
-# --- HYBRID RECONSTRUCTION SOURCE INTERCEPT ENGINE ---
+# ==============================================================================
+# RESTORED TRADINGVIEW DATA PIPELINE
+# ==============================================================================
 @st.cache_data(show_spinner=False)
 def fetch_legacy_market_data(asset_name, interval_str):
-    is_crypto = "SPX" not in asset_name and "QQQ" not in asset_name
-    
-    if is_crypto and drive_df is not None:
-        try:
-            clean_name = asset_name.lower()
-            # Try to catch tokens matching file sub-strings (e.g., "btc" inside "bitcoin (btc)")
-            matching_col = next((c for c in drive_df.columns if c in clean_name or clean_name in c), None)
-            
-            if matching_col:
-                df_slice = drive_df[[matching_col]].dropna().copy()
-                df_slice.columns = ['close']
-                df_slice['open'] = df_slice['close']
-                df_slice['high'] = df_slice['close']
-                df_slice['low'] = df_slice['close']
-                df_slice['volume'] = 0
-                return df_slice
-        except:
-            pass
-
     symbol, exchange = ticker_map.get(asset_name, ('BTCUSD', 'BINANCE'))
+    
+    # Map the interface options back to TradingView Intervals
     interval_dict = {
-        '1M': Interval.in_monthly, '1w': Interval.in_weekly, '1d': Interval.in_daily,
-        '4h': Interval.in_4_hour, '1h': Interval.in_1_hour
+        '1M': Interval.in_monthly,
+        '1w': Interval.in_weekly,
+        '1d': Interval.in_daily,
+        '4h': Interval.in_4_hour,
+        '1h': Interval.in_1_hour,
+        '15m': Interval.in_15_minute,
+        '5m': Interval.in_5_minute,
+        '1m': Interval.in_1_minute
     }
     tv_interval = interval_dict.get(interval_str, Interval.in_daily)
         
     try:
         tv = TvDatafeed()
-        df = tv.get_hist(symbol=symbol, exchange=exchange, interval=tv_interval, n_bars=3000)
+        # Request a highly optimized row count for calculations
+        df = tv.get_hist(symbol=symbol, exchange=exchange, interval=tv_interval, n_bars=4000)
         if df is None or df.empty: return None
+        
         df.index.name = 'time'
+        # Standardize naming cases for model execution
+        df.rename(columns={'open': 'open', 'high': 'high', 'low': 'low', 'close': 'close', 'volume': 'volume'}, inplace=True)
         return df[['open', 'high', 'low', 'close', 'volume']]
     except:
         return None
 
-# --- ENGINE MODULE 1 (FRACTAL SCANNER) ---
+# ==============================================================================
+# STRUCTURAL CORRELATION ENGINE MODULE
+# ==============================================================================
+def calculate_rolling_correlation(series_a, series_b, lookback_window):
+    arr_a = np.array(series_a, dtype=float).flatten()
+    arr_b = np.array(series_b, dtype=float).flatten()
+    min_len = min(len(arr_a), len(arr_b))
+    if min_len == 0: return []
+    df = pd.DataFrame({'Target_Curve': arr_a[:min_len], 'Match_Curve': arr_b[:min_len]})
+    df['Ret_A'] = df['Target_Curve'].pct_change()
+    df['Ret_C'] = df['Match_Curve'].pct_change()
+    return df['Ret_A'].rolling(window=int(lookback_window)).corr(df['Ret_C']).fillna(0.0).tolist()
+
+# ==============================================================================
+# MAIN CORE: ENGINE MODULE 1 (FRACTAL SCANNER)
+# ==============================================================================
 if app_mode == "Algorithmic Fractal Scan":
-    st.header("🎯 System Core Fractal Scanner")
+    st.header("🎯 TradingView Core Fractal Scanner")
     
     t_asset = st.sidebar.selectbox("Baseline Target Asset", list(ticker_map.keys()), index=0)
     s_pool = st.sidebar.selectbox("Scan Matching Pool Range", ["All Assets"] + list(ticker_map.keys()), index=0)
-    i_choice = st.sidebar.selectbox("Sequence Time Frame Interval", ['1M', '1w', '1d', '4h', '1h'], index=2)
+    i_choice = st.sidebar.selectbox("Sequence Time Frame Interval", ['1M', '1w', '1d', '4h', '1h', '15m', '5m', '1m'], index=2)
     f_mode = st.sidebar.selectbox("Framework Processing Mode", ["Calculate Fractals", "Manual Compare"], index=0)
+    
+    st.sidebar.markdown("### 📊 Inter-Asset Correlation Layer")
+    enable_corr = st.sidebar.checkbox("Overlay Rolling Macro Asset Correlation", value=False)
+    corr_window = st.sidebar.text_input("Correlation Lookback Window (Bars)", value="10")
+    
+    start_d = st.sidebar.text_input("Analysis Target Window Start", value="latest")
+    end_d = st.sidebar.text_input("Analysis Target Window End", value="latest")
+    
+    ov_starts = st.sidebar.text_input("Manual Overlay Window Starts", value="2020-03-01, 2022-11-01")
+    ov_ends = st.sidebar.text_input("Manual Overlay Window Ends", value="2020-05-01, 2023-01-01")
     
     t_bars = st.sidebar.text_input("Scanning Sequence Width (Bars)", value="30")
     f_bars = st.sidebar.text_input("Forward Projection Target (Bars)", value="15")
     n_fractals = st.sidebar.text_input("Maximum Displayed Fractals", value="5")
     iso_path = st.sidebar.text_input("Focus Highlight Mode Target (Number/All/Mean)", value="all")
+    
     c_filter = st.sidebar.selectbox("US Cycle Macro Regime Filter", ['All Cycles', 'Election Year', 'Post-Election', 'Midterm Year', 'Pre-Election'], index=0)
     spec_years = st.sidebar.text_input("Restrict Matching to Specific Calendar Years", value="all")
     g_bars = st.sidebar.text_input("Temporal Separation Buffer Width (Bars)", value="20")
@@ -204,6 +140,7 @@ if app_mode == "Algorithmic Fractal Scan":
         gap_bars_num = int(g_bars)
         vol_boost_pct = float(v_boost)
         std_dev_multiplier = float(s_bands)
+        c_win = int(corr_window)
     except ValueError:
         st.error("⚠️ Input Parse Warning: Confirm all dynamic inputs contain clean numeric integers.")
         st.stop()
@@ -211,19 +148,69 @@ if app_mode == "Algorithmic Fractal Scan":
     try:
         df_target = fetch_legacy_market_data(t_asset, i_choice)
         if df_target is None or df_target.empty:
-            st.error("❌ Data source stream blank or unavailable. Check variables.")
+            st.error("❌ Data download error from TradingView backend systems. Retry executing pipeline.")
             st.stop()
             
         close_target = df_target['close'].dropna()
-        target_df = close_target.iloc[-target_bars_num:]
+        start_clean = start_d.strip().lower()
+        end_clean = end_d.strip().lower()
+        
+        if start_clean == 'latest' or end_clean == 'latest':
+            target_df = close_target.iloc[-target_bars_num:]
+        else:
+            try:
+                target_df = close_target.loc[pd.to_datetime(start_clean):pd.to_datetime(end_clean)]
+                if len(target_df) == 0:
+                    target_df = close_target.iloc[-target_bars_num:]
+            except:
+                target_df = close_target.iloc[-target_bars_num:]
+                
         target_bars_num = len(target_df)
+        if target_bars_num == 0:
+            st.error("Selected timeline coordinates do not contain market bar metrics.")
+            st.stop()
+            
         target_scaled = percentage_return_scale(target_df.tolist())
         
         plt.style.use('dark_background')
-        fig_frac, ax1 = plt.subplots(1, 1, figsize=(16, 8))
-        ax1.plot(target_scaled, color='#00ffcc', linewidth=4, label=f'TARGET: {t_asset}', zorder=5)
+        if enable_corr:
+            fig_frac, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 11), sharex=True, gridspec_kw={'height_ratios': [2.5, 1]})
+        else:
+            fig_frac, ax1 = plt.subplots(1, 1, figsize=(16, 8))
+            ax2 = None
+            
+        ax1.plot(target_scaled, color='#00ffcc', linewidth=4, label=f'TARGET: {t_asset} (Baseline)', zorder=5)
         
-        if f_mode != "Manual Compare":
+        if f_mode == "Manual Compare":
+            starts = [s.strip() for s in ov_starts.split(',') if s.strip()]
+            ends = [e.strip() for e in ov_ends.split(',') if e.strip()]
+            manual_paths_list = []
+            isolate_clean = iso_path.strip().lower()
+            
+            for idx, (st_val, ed_val) in enumerate(zip(starts, ends)):
+                try:
+                    ov_df = close_target.loc[pd.to_datetime(st_val):pd.to_datetime(ed_val)]
+                    if len(ov_df) == 0: continue
+                    ov_scaled = percentage_return_scale(ov_df.tolist())
+                    manual_paths_list.append(ov_scaled)
+                    
+                    if isolate_clean == 'all' or (isolate_clean.isdigit() and int(isolate_clean) == idx + 1):
+                        ax1.plot(ov_scaled, linewidth=2, linestyle='--', alpha=0.6, label=f'Manual #{idx+1} [{st_val}]')
+                except:
+                    pass
+            
+            if manual_paths_list and isolate_clean in ['all', 'mean']:
+                max_len = max(len(p) for p in manual_paths_list)
+                padded_list = [np.pad(p, (0, max_len - len(p)), 'edge') if len(p) < max_len else p for p in manual_paths_list]
+                manual_matrix = np.vstack(padded_list)
+                m_mean = np.mean(manual_matrix, axis=0) * (1.0 + (vol_boost_pct / 100.0))
+                m_std = np.std(manual_matrix, axis=0) * (1.0 + (vol_boost_pct / 100.0))
+                
+                if std_dev_multiplier > 0:
+                    ax1.fill_between(range(len(m_mean)), m_mean - (m_std * std_dev_multiplier), m_mean + (m_std * std_dev_multiplier), color='#ffff00', alpha=0.12)
+                ax1.plot(m_mean, color='#ffff00', linewidth=4, label='MANUAL COMPOSITE MEAN TRACK', zorder=6)
+
+        else:
             assets_to_scan = list(ticker_map.keys()) if s_pool == "All Assets" else [s_pool]
             all_discovered_results = []
             
@@ -232,7 +219,7 @@ if app_mode == "Algorithmic Fractal Scan":
                 if df_scan is None or df_scan.empty: continue
                 close_scan = df_scan['close'].dropna()
                 
-                if asset_item == t_asset:
+                if asset_item == t_asset and (start_clean == 'latest' or end_clean == 'latest'):
                     history_pool = close_scan.iloc[:-target_bars_num].tolist()
                     history_dates = close_scan.index[:-target_bars_num]
                 else:
@@ -245,13 +232,9 @@ if app_mode == "Algorithmic Fractal Scan":
                 parsed_years = [int(y.strip()) for y in spec_years.split(',') if y.strip() and y.lower() != 'all']
                 
                 for i in range(max_search_index):
-                    try:
-                        hist_year = history_dates[i].year
-                        if hist_year == 2026: continue
-                        hist_regime = get_election_regime(hist_year)
-                    except:
-                        hist_year = 0
-                        hist_regime = 'All Cycles'
+                    hist_year = history_dates[i].year
+                    if hist_year == 2026: continue
+                    hist_regime = get_election_regime(hist_year)
                     
                     if c_filter != 'All Cycles' and hist_regime != c_filter: continue
                     if parsed_years and hist_year not in parsed_years: continue
@@ -260,13 +243,13 @@ if app_mode == "Algorithmic Fractal Scan":
                     hist_scaled = percentage_return_scale(hist_pattern)
                     
                     mse = float(np.mean((target_scaled - hist_scaled) ** 2))
-                    corr = float(np.corrcoef(target_scaled, hist_scaled)[0, 1]) if len(target_scaled) > 1 else 0.0
+                    corr = float(np.corrcoef(target_scaled, hist_scaled)[0, 1])
                     
                     all_discovered_results.append({
                         'asset_name': asset_item, 'start_index': i, 'end_index': i + target_bars_num,
                         'mse': mse, 'correlation': corr, 'year': hist_year,
                         'raw_prices': history_pool[i : i + target_bars_num + forecast_bars_num],
-                        'date_str': history_dates[i].strftime('%Y-%m-%d') if hasattr(history_dates[i], 'strftime') else f"Idx {i}"
+                        'date_str': history_dates[i].strftime('%Y-%m-%d %H:%M')
                     })
             
             if all_discovered_results:
@@ -302,64 +285,117 @@ if app_mode == "Algorithmic Fractal Scan":
                     ax1.plot(mean_path_array, color='#ffff00', linewidth=4, label='COMPOSITE FRACTAL MEAN (Excluding 2026)', zorder=6)
                 ax1.axvline(x=target_bars_num - 1, color='#ffffff', linestyle=':', alpha=0.5)
 
+                if enable_corr and ax2 is not None and mean_path_array is not None:
+                    r_wave = calculate_rolling_correlation(target_scaled, mean_path_array, c_win)
+                    ax2.plot(r_wave, color='#ffff00', linewidth=2.5, label=f"Rolling {c_win}-Bar Correlation")
+                    ax2.fill_between(range(len(r_wave)), r_wave, 0, where=(np.array(r_wave) >= 0), color='#00ff88', alpha=0.15)
+                    ax2.fill_between(range(len(r_wave)), r_wave, 0, where=(np.array(r_wave) < 0), color='#ff0055', alpha=0.15)
+
         ax1.axhline(y=0.0, color='#555555', linestyle='-', linewidth=1.2)
-        ax1.set_title("HRF MATRIX ENGINE — MULTI-ASSET COMPRESSION LAYER", color='#ffffff', fontsize=12, fontweight='bold')
+        ax1.set_title("HRF MATRIX ENGINE — UNIFIED CRYPTO CORE CANVAS", color='#ffffff', fontsize=12, fontweight='bold')
         ax1.set_ylabel("Percentage Performance Shift (%)")
         ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:+.1f}%'))
         ax1.legend(loc='upper left', facecolor='#111111', edgecolor='#333333')
+        
+        if enable_corr and ax2 is not None:
+            ax2.axhline(0.0, color='#ffffff', linestyle='-', linewidth=0.8, alpha=0.5)
+            ax2.set_ylim(-1.05, 1.05)
+            ax2.set_ylabel("Correlation R-Scale")
+            ax2.grid(True, color='#222222')
         
         plt.tight_layout()
         st.pyplot(fig_frac)
     except Exception as e:
         st.error(f"Ecosystem halted: {e}")
 
-# --- ENGINE MODULE 2 (STRUCTURAL CAPITULATION WAVE) ---
+# ==============================================================================
+# ENGINE MODULE 2: CAPITULATION & DAYS SINCE RESET ENGINE
+# ==============================================================================
 else:
     st.header("⏱️ Path-Dependent Peak-To-Trough Reset Wave")
     vol_input = st.sidebar.text_input("Volatility Reset Threshold (%)", value="-40.0")
     pattern_input = st.sidebar.text_input("Candle Sequence Pattern (G/R)", value="RRGG")
     
+    @st.cache_data(show_spinner="🔄 Loading Lifetime Public Archive Pools...")
+    def load_capitulation_data():
+        df_d = fetch_legacy_market_data("Bitcoin (BTC)", "1d")
+        df_w = fetch_legacy_market_data("Bitcoin (BTC)", "1w")
+        
+        for df in [df_d, df_w]:
+            if df is not None:
+                df['return'] = ((df['close'] - df['open']) / df['open']) * 100.0
+                df['is_midterm'] = (df.index.year % 4 == 2)
+        return df_d, df_w
+
     try:
-        df_daily_raw = fetch_legacy_market_data("Bitcoin (BTC)", "1d")
+        df_daily_raw, df_weekly = load_capitulation_data()
         if df_daily_raw is None or df_daily_raw.empty:
-            st.error("❌ High-density historical data streams unreachable.")
+            st.error("❌ Deep data streams unavailable right now. Try switching core engines.")
             st.stop()
             
         df_daily = df_daily_raw.copy()
-        df_daily['return'] = ((df_daily['close'] - df_daily['open']) / df_daily['open']) * 100.0
-        try:
-            df_daily['is_midterm'] = (df_daily.index.year % 4 == 2)
-        except:
-            df_daily['is_midterm'] = False
-
         thresh = float(vol_input)
         days_since_tracker = []
         current_accumulator = 0
         
-        running_peak = df_daily['high'].iloc[0]
-        for idx in range(len(df_daily)):
-            current_high = df_daily['high'].iloc[idx]
-            current_low = df_daily['low'].iloc[idx]
-            if current_high > running_peak: running_peak = current_high
-            drawdown_pct = ((current_low - running_peak) / running_peak) * 100.0
-            if drawdown_pct <= thresh:
-                days_since_tracker.append(0)
-                current_accumulator = 0
-                running_peak = current_high
-            else:
-                current_accumulator += 1
-                days_since_tracker.append(current_accumulator)
+        if thresh < 0:
+            running_peak = df_daily['high'].iloc[0]
+            for idx in range(len(df_daily)):
+                current_high = df_daily['high'].iloc[idx]
+                current_low = df_daily['low'].iloc[idx]
+                if current_high > running_peak: running_peak = current_high
+                drawdown_pct = ((current_low - running_peak) / running_peak) * 100.0
+                if drawdown_pct <= thresh:
+                    days_since_tracker.append(0)
+                    current_accumulator = 0
+                    running_peak = current_high
+                else:
+                    current_accumulator += 1
+                    days_since_tracker.append(current_accumulator)
+        else:
+            running_trough = df_daily['low'].iloc[0]
+            for idx in range(len(df_daily)):
+                current_high = df_daily['high'].iloc[idx]
+                current_low = df_daily['low'].iloc[idx]
+                if current_low < running_trough: running_trough = current_low
+                expansion_pct = ((current_high - running_trough) / running_trough) * 100.0
+                if expansion_pct >= thresh:
+                    days_since_tracker.append(0)
+                    current_accumulator = 0
+                    running_trough = current_low
+                else:
+                    current_accumulator += 1
+                    days_since_tracker.append(current_accumulator)
         
         current_live_gap = days_since_tracker[-1]
+        clean_pattern = pattern_input.strip().upper()
+        candle_string_sequence = "".join(['G' if r >= 0 else 'R' for r in df_daily['return'].tolist()])
+        match_indices = [i + len(clean_pattern) for i in range(len(candle_string_sequence) - len(clean_pattern)) if candle_string_sequence[i : i + len(clean_pattern)] == clean_pattern]
         
         plt.style.use('dark_background')
-        fig, ax = plt.subplots(figsize=(16, 6))
-        ax.plot(df_daily.index, days_since_tracker, color='#00ffcc', linewidth=1.2)
-        ax.fill_between(df_daily.index, 0, days_since_tracker, color='#00ffcc', alpha=0.06)
-        ax.set_title("CHART: STRUCTURAL RESETS TIMELINE WAVE (PATH DEPENDENT)", fontweight='bold')
+        fig, (ax1, ax3) = plt.subplots(1, 2, figsize=(16, 6))
+        
+        ax1.hist(df_daily['return'].dropna().values, bins=100, range=(-15, 15), color='#8a2be2', alpha=0.6, label='Daily Lifetime')
+        ax1.set_title("HISTOGRAM 1: TOTAL DAILY RETURN FREQUENCY", fontweight='bold', fontsize=10)
+        
+        ax3.plot(df_daily.index, days_since_tracker, color='#00ffcc', linewidth=1.2, label='Days Since')
+        ax3.fill_between(df_daily.index, 0, days_since_tracker, color='#00ffcc', alpha=0.06)
+        ax3.set_title("CHART 2: STRUCTURAL RESETS TIMELINE WAVE", fontweight='bold', fontsize=10)
+        
+        plt.tight_layout(pad=3.0)
         st.pyplot(fig)
         
-        st.metric("Current Days Stretched Under Matrix Threshold", f"{current_live_gap} Days")
+        st.subheader("📊 Performance Summary Matrix")
+        metrics_data = {
+            "Timeframe Segment": ["Daily Changes", "Weekly Changes"],
+            "Lifetime History Average": [f"{df_daily['return'].mean():+.4f}%", f"{df_weekly['return'].mean():+.4f}%" if df_weekly is not None else "N/A"],
+            "US Midterm Cycles Only": [f"{df_daily[df_daily['is_midterm']]['return'].mean():+.4f}%", f"{df_weekly[df_weekly['is_midterm']]['return'].mean():+.4f}%" if df_weekly is not None else "N/A"]
+        }
+        st.table(pd.DataFrame(metrics_data))
+        
+        col1, col2 = st.columns(2)
+        col1.metric("Current Days Stretched Under Matrix", f"{current_live_gap} Days")
+        col2.metric(f"Historical '{clean_pattern}' Frequency Discoveries", f"{len(match_indices)} Matches")
     except Exception as ex:
         st.error(f"Execution Error: {ex}")
 
