@@ -62,7 +62,6 @@ def get_election_regime(year):
 def fetch_legacy_market_data(asset_name, interval_str):
     symbol, exchange = ticker_map.get(asset_name, ('BTCUSD', 'BINANCE'))
     
-    # Map the interface options back to TradingView Intervals
     interval_dict = {
         '1M': Interval.in_monthly,
         '1w': Interval.in_weekly,
@@ -77,12 +76,10 @@ def fetch_legacy_market_data(asset_name, interval_str):
         
     try:
         tv = TvDatafeed()
-        # Request a highly optimized row count for calculations
         df = tv.get_hist(symbol=symbol, exchange=exchange, interval=tv_interval, n_bars=4000)
         if df is None or df.empty: return None
         
         df.index.name = 'time'
-        # Standardize naming cases for model execution
         df.rename(columns={'open': 'open', 'high': 'high', 'low': 'low', 'close': 'close', 'volume': 'volume'}, inplace=True)
         return df[['open', 'high', 'low', 'close', 'volume']]
     except:
@@ -353,21 +350,27 @@ if app_mode == "Algorithmic Fractal Scan":
         st.error(f"Ecosystem halted: {e}")
 
 # ==============================================================================
-# ENGINE MODULE 2: STRUCTURAL CAPITULATION WAVE (MATHEMATICAL QUANT PLAYGROUND)
+# ENGINE MODULE 2: STRUCTURAL CAPITULATION WAVE (RESTORED & EXPANDED PLAYGROUND)
 # ==============================================================================
 else:
     st.header("🧮 Structural Indicator Capitulation Wave Playground")
     
-    # Feature 1 & 2: Asset and Time Interval Selection
     playground_asset = st.sidebar.selectbox("Asset Target Matrix", list(ticker_map.keys()), index=0)
     playground_interval = st.sidebar.selectbox("Time Interval Scale", ['1M', '1w', '1d', '4h', '1h', '15m', '5m', '1m'], index=4)
     
-    # Feature 3: Time Frame (Precise temporal series window)
     st.sidebar.markdown("### 📅 Precise Temporal Window")
     start_time_str = st.sidebar.text_input("Start Time (YYYY-MM-DD HH:MM)", value="2026-01-01 00:00")
     end_time_str = st.sidebar.text_input("End Time (YYYY-MM-DD HH:MM)", value="2026-07-14 00:00")
     
-    # Feature 4: Indicators Selection
+    # NEW FEATURE 1: Asset simulated Percentage shift factor
+    st.sidebar.markdown("### ⚡ Capitulation Shift Engine")
+    pct_shift_str = st.sidebar.text_input("Simulate Asset Percentage Shift (e.g. -70% or +50%)", value="0%")
+    
+    # NEW FEATURE 2: Candle Custom Sequence Engine
+    st.sidebar.markdown("### 🕯️ Candlestick Pattern Lookup & Lookahead")
+    candle_pattern_input = st.sidebar.text_input("Target Color String Sequence (e.g., ggrrgg)", value="ggrrgg").strip().lower()
+    lookahead_candles = st.sidebar.number_input("Forward Lookahead Candle Window", min_value=1, max_value=200, value=10)
+    
     st.sidebar.markdown("### 📈 Indicator Core Selection")
     selected_indicator = st.sidebar.selectbox("Target Indicator", [
         "Relative Strength Index (RSI)",
@@ -381,7 +384,6 @@ else:
         "Weighted Moving Average (WMA)"
     ])
     
-    # Feature 5: Operations Matrix (+ - * / ^ sqrt)
     selected_op = st.sidebar.selectbox("Mathematical Operational Engine", [
         "Divide Asset by Indicator (/) ", 
         "Multiply Asset by Indicator (*)", 
@@ -391,7 +393,6 @@ else:
         "Square Root of Asset Matrix (sqrt)"
     ])
     
-    # Feature 6: Indicator Settings Panel
     st.sidebar.markdown("### ⚙️ Indicator Tuning Matrix")
     indicator_period = st.sidebar.number_input("Indicator Lookback Window Length", min_value=1, max_value=500, value=14)
     bb_std_dev = st.sidebar.number_input("Bollinger Band Standard Deviation Multiplier", min_value=0.1, max_value=5.0, value=2.0)
@@ -404,9 +405,17 @@ else:
             st.error("❌ Target dataset empty. Verify connection or increase data bar limits.")
             st.stop()
             
-        # Parse complete historical layout prior to slicing to avoid boundary distortion
         df_play = df_play.copy().sort_index()
         
+        # Parse simulated percentage structural shift modifier
+        try:
+            clean_pct = pct_shift_str.replace('%', '').strip()
+            shift_multiplier = 1.0 + (float(clean_pct) / 100.0)
+        except:
+            shift_multiplier = 1.0
+            st.sidebar.warning("⚠️ Invalid % entry. Shift tracking defaulted to 0%.")
+
+        # Process standard indicators across raw stream base layer
         if "Simple Moving Average" in selected_indicator or "(SMA)" in selected_indicator:
             ind_series = df_play['close'].rolling(window=int(indicator_period)).mean()
         elif "Exponential Moving Average" in selected_indicator or "(EMA)" in selected_indicator:
@@ -431,48 +440,87 @@ else:
         # Apply precise timestamp coordinate window filtering 
         t_start = pd.to_datetime(start_time_str.strip())
         t_end = pd.to_datetime(end_time_str.strip())
-        df_filtered = df_play.loc[t_start:t_end]
+        df_filtered = df_play.loc[t_start:t_end].copy()
         
         if df_filtered.empty:
             st.warning("⚠️ Filter Window Warning: The parsed date coordinates do not match any retrieved market timestamps inside the TradingView engine.")
             st.stop()
             
-        # Run calculation operations matrix
-        asset_close = df_filtered['close']
+        # Execute mathematical shift logic directly across the target frame layer
+        asset_close = df_filtered['close'] * shift_multiplier
         indicator_val = df_filtered['INDICATOR_VAL']
         
         if "Divide" in selected_op:
             math_result = asset_close / (indicator_val + 1e-10)
-            op_label = "Asset / Indicator Ratio"
+            op_label = f"Asset (Shifted) / Indicator Ratio"
         elif "Multiply" in selected_op:
             math_result = asset_close * indicator_val
-            op_label = "Asset * Indicator Matrix"
+            op_label = f"Asset (Shifted) * Indicator Matrix"
         elif "Subtract" in selected_op:
             math_result = asset_close - indicator_val
-            op_label = "Asset - Indicator Spread"
+            op_label = f"Asset (Shifted) - Indicator Spread"
         elif "Add" in selected_op:
             math_result = asset_close + indicator_val
-            op_label = "Asset + Indicator Cumulative"
+            op_label = f"Asset (Shifted) + Indicator Cumulative"
         elif "Raise" in selected_op:
             math_result = asset_close ** indicator_val
-            op_label = "Asset ^ Indicator Exponential Power"
+            op_label = f"Asset (Shifted) ^ Indicator Exponential Power"
         elif "Square Root" in selected_op:
             math_result = np.sqrt(asset_close)
-            op_label = "√Asset Matrix Scaling"
+            op_label = f"√Asset (Shifted) Matrix Scaling"
+
+        # --- RE-INTEGRATED ORIGINAL PATH DEPENDENT STATISTICAL DRAWDOWN RESTORATION CORE ---
+        running_max = -np.inf
+        calculated_drawdown_series = []
+        
+        for price_point in asset_close:
+            if price_point > running_max:
+                running_max = price_point
+                calculated_drawdown_series.append(0.0)
+            else:
+                dd_val = ((running_max - price_point) / running_max) * 100.0
+                calculated_drawdown_series.append(dd_val)
+                
+        df_filtered['HRF_RESTORED_DRAWDOWN'] = calculated_drawdown_series
+
+        # --- CANDLESTICK COLOR PATTERN SEARCH ENGINE ---
+        df_filtered['candle_color'] = np.where(df_filtered['close'] >= df_filtered['open'], 'g', 'r')
+        color_string_stream = "".join(df_filtered['candle_color'].tolist())
+        
+        match_indices = []
+        pattern_len = len(candle_pattern_input)
+        if pattern_len > 0:
+            start_pos = 0
+            while True:
+                pos = color_string_stream.find(candle_pattern_input, start_pos)
+                if pos == -1:
+                    break
+                match_indices.append(pos + pattern_len - 1) # Capture exact index completion index edge
+                start_pos = pos + 1
 
         # Matplotlib visualization rendering zone using custom color scheme layout guidelines (Red/Purple focus)
         plt.style.use('dark_background')
-        fig_play, (ax_main, ax_op) = plt.subplots(2, 1, figsize=(16, 10), sharex=True, gridspec_kw={'height_ratios': [2, 2]})
+        fig_play, (ax_main, ax_op, ax_dd) = plt.subplots(3, 1, figsize=(16, 13), sharex=True, 
+                                                         gridspec_kw={'height_ratios': [2, 1.5, 1.5]})
         
         # Upper Canvas Segment: Target Price Action Baseline
-        ax_main.plot(df_filtered.index, asset_close, color='#8a2be2', linewidth=2.5, label=f"{playground_asset} Close Price")
+        ax_main.plot(df_filtered.index, asset_close, color='#8a2be2', linewidth=2.5, label=f"{playground_asset} Close Price (Shifted x{shift_multiplier:.2f})")
         if "ATR" not in selected_indicator and "RSI" not in selected_indicator and "MACD" not in selected_indicator:
             ax_main.plot(df_filtered.index, indicator_val, color='#ff00ff', linewidth=1.5, linestyle='--', label=f"Overlayed {selected_indicator}")
+            
+        # Highlight match zones and lookahead regions
+        for m_idx in match_indices:
+            if m_idx < len(df_filtered):
+                ax_main.axvline(df_filtered.index[m_idx], color='#00ffcc', linestyle='-', alpha=0.7, linewidth=1.5)
+                # Compute projection frame boundary
+                end_proj_idx = min(m_idx + int(lookahead_candles), len(df_filtered) - 1)
+                ax_main.axvspan(df_filtered.index[m_idx], df_filtered.index[end_proj_idx], color='#00ffcc', alpha=0.1)
+
         ax_main.set_title(f"PRIMARY TRACKER: {playground_asset} ({playground_interval} Interval)", fontsize=11, fontweight='bold', color='#ffffff')
         ax_main.legend(loc='upper left', facecolor='#111111', edgecolor='#333333')
         ax_main.grid(True, color='#222222')
         
-        # Lower Canvas Segment: Mathematical Engine Result
+        # Middle Canvas Segment: Mathematical Engine Result
         ax_op.plot(df_filtered.index, math_result, color='#ff0055', linewidth=3, label=f"Calculated: {op_label}")
         ax_op.fill_between(df_filtered.index, math_result, math_result.mean(), color='#ff0055', alpha=0.08)
         ax_op.axhline(math_result.mean(), color='#ffffff', linestyle=':', alpha=0.6, label=f"Mean Baseline ({math_result.mean():.2f})")
@@ -480,15 +528,26 @@ else:
         ax_op.legend(loc='upper left', facecolor='#111111', edgecolor='#333333')
         ax_op.grid(True, color='#222222')
         
+        # Lower Canvas Segment: Reintegrated Restored Conditional High Reset Drawdown Framework 
+        ax_dd.plot(df_filtered.index, df_filtered['HRF_RESTORED_DRAWDOWN'], color='#a100ff', linewidth=2.5, label="HRF Path-Dependent Drawdown Engine Tracker")
+        ax_dd.fill_between(df_filtered.index, df_filtered['HRF_RESTORED_DRAWDOWN'], 0, color='#a100ff', alpha=0.15)
+        ax_dd.invert_yaxis()  # Standard risk matrix layout rendering format
+        ax_dd.set_ylabel("Drawdown Percentage Amplitude Scale (%)")
+        ax_dd.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'-{y:.1f}%'))
+        ax_dd.set_title("⚠️ SYSTEM CORE RISK PROFILE LAYER (RESTORED RUNNING FRAMEWORK)", fontsize=11, fontweight='bold', color='#ffffff')
+        ax_dd.legend(loc='upper left', facecolor='#111111', edgecolor='#333333')
+        ax_dd.grid(True, color='#222222')
+        
         plt.tight_layout(pad=3.0)
         st.pyplot(fig_play)
         
         # Performance matrix monitoring deck
         st.subheader("📊 Quant Wave Performance Matrix")
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         col1.metric("Final Formula Coordinate", f"{math_result.iloc[-1]:,.4f}")
         col2.metric("Matrix Peak High", f"{math_result.max():,.4f}")
-        col3.metric("Matrix Cycle Low", f"{math_result.min():,.4f}")
+        col3.metric("Max Calculated Structural Drawdown", f"-{df_filtered['HRF_RESTORED_DRAWDOWN'].max():.2f}%")
+        col4.metric("Identified Sequence Clusters Found", f"{len(match_indices)} matches")
         
     except Exception as ex:
         st.error(f"Playground Compilation Fault: {ex}")
