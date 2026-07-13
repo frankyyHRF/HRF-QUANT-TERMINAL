@@ -102,6 +102,50 @@ def calculate_rolling_correlation(series_a, series_b, lookback_window):
     return df['Ret_A'].rolling(window=int(lookback_window)).corr(df['Ret_C']).fillna(0.0).tolist()
 
 # ==============================================================================
+# ENGINE HELPER FUNCTIONS FOR MATHEMATICAL INTEGRATION
+# ==============================================================================
+def calculate_wma(series, period):
+    weights = np.arange(1, period + 1)
+    return series.rolling(period).apply(lambda x: np.dot(x, weights) / weights.sum(), raw=True)
+
+def calculate_rsi(series, period):
+    delta = series.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+    rs = gain / (loss + 1e-10)
+    return 100 - (100 / (1 + rs))
+
+def calculate_atr(df, period):
+    high_low = df['high'] - df['low']
+    high_close = (df['high'] - df['close'].shift()).abs()
+    low_close = (df['low'] - df['close'].shift()).abs()
+    ranges = pd.concat([high_low, high_close, low_close], axis=1)
+    true_range = ranges.max(axis=1)
+    return true_range.rolling(period).mean()
+
+def calculate_supertrend(df, period, multiplier):
+    atr = calculate_atr(df, period)
+    hl2 = (df['high'] + df['low']) / 2
+    upper_band = hl2 + (multiplier * atr)
+    lower_band = hl2 - (multiplier * atr)
+    
+    supertrend = np.zeros(len(df))
+    in_uptrend = True
+    
+    for i in range(1, len(df)):
+        if df['close'].iloc[i] > upper_band.iloc[i-1]:
+            in_uptrend = True
+        elif df['close'].iloc[i] < lower_band.iloc[i-1]:
+            in_uptrend = False
+            
+        supertrend[i] = lower_band.iloc[i] if in_uptrend else upper_band.iloc[i]
+    return pd.Series(supertrend, index=df.index)
+
+def calculate_vwap(df):
+    tp = (df['high'] + df['low'] + df['close']) / 3
+    return (tp * df['volume']).cumsum() / (df['volume'].cumsum() + 1e-10)
+
+# ==============================================================================
 # MAIN CORE: ENGINE MODULE 1 (FRACTAL SCANNER)
 # ==============================================================================
 if app_mode == "Algorithmic Fractal Scan":
@@ -268,7 +312,7 @@ if app_mode == "Algorithmic Fractal Scan":
                     scaled_full = ((np.array(raw_full) - raw_full[0]) / raw_full[0]) * 100.0 if raw_full[0] != 0 else np.zeros_like(raw_full)
                     all_scaled_paths_list.append(scaled_full)
                     
-                mean_path_array = np.mean(np.vstack(all_scaled_paths_list), axis=0) * (1.0 + (vol_boost_pct / 100.0)) if all_scaled_paths_list else None
+                    mean_path_array = np.mean(np.vstack(all_scaled_paths_list), axis=0) * (1.0 + (vol_boost_pct / 100.0)) if all_scaled_paths_list else None
                 isolate_clean = iso_path.strip().lower()
                 
                 if isolate_clean != 'mean':
@@ -309,95 +353,145 @@ if app_mode == "Algorithmic Fractal Scan":
         st.error(f"Ecosystem halted: {e}")
 
 # ==============================================================================
-# ENGINE MODULE 2: CAPITULATION & DAYS SINCE RESET ENGINE
+# ENGINE MODULE 2: STRUCTURAL CAPITULATION WAVE (MATHEMATICAL QUANT PLAYGROUND)
 # ==============================================================================
 else:
-    st.header("⏱️ Path-Dependent Peak-To-Trough Reset Wave")
-    vol_input = st.sidebar.text_input("Volatility Reset Threshold (%)", value="-40.0")
-    pattern_input = st.sidebar.text_input("Candle Sequence Pattern (G/R)", value="RRGG")
+    st.header("🧮 Structural Indicator Capitulation Wave Playground")
     
-    @st.cache_data(show_spinner="🔄 Loading Lifetime Public Archive Pools...")
-    def load_capitulation_data():
-        df_d = fetch_legacy_market_data("Bitcoin (BTC)", "1d")
-        df_w = fetch_legacy_market_data("Bitcoin (BTC)", "1w")
-        
-        for df in [df_d, df_w]:
-            if df is not None:
-                df['return'] = ((df['close'] - df['open']) / df['open']) * 100.0
-                df['is_midterm'] = (df.index.year % 4 == 2)
-        return df_d, df_w
+    # Feature 1 & 2: Asset and Time Interval Selection
+    playground_asset = st.sidebar.selectbox("Asset Target Matrix", list(ticker_map.keys()), index=0)
+    playground_interval = st.sidebar.selectbox("Time Interval Scale", ['1M', '1w', '1d', '4h', '1h', '15m', '5m', '1m'], index=4)
+    
+    # Feature 3: Time Frame (Precise temporal series window)
+    st.sidebar.markdown("### 📅 Precise Temporal Window")
+    start_time_str = st.sidebar.text_input("Start Time (YYYY-MM-DD HH:MM)", value="2026-01-01 00:00")
+    end_time_str = st.sidebar.text_input("End Time (YYYY-MM-DD HH:MM)", value="2026-07-14 00:00")
+    
+    # Feature 4: Indicators Selection
+    st.sidebar.markdown("### 📈 Indicator Core Selection")
+    selected_indicator = st.sidebar.selectbox("Target Indicator", [
+        "Relative Strength Index (RSI)",
+        "MACD Line",
+        "Bollinger Bands (Middle)",
+        "SuperTrend",
+        "Average True Range (ATR)",
+        "Volume Weighted Average Price (VWAP)",
+        "Simple Moving Average (SMA)", 
+        "Exponential Moving Average (EMA)", 
+        "Weighted Moving Average (WMA)"
+    ])
+    
+    # Feature 5: Operations Matrix (+ - * / ^ sqrt)
+    selected_op = st.sidebar.selectbox("Mathematical Operational Engine", [
+        "Divide Asset by Indicator (/) ", 
+        "Multiply Asset by Indicator (*)", 
+        "Subtract Indicator from Asset (-)", 
+        "Add Asset and Indicator (+)",
+        "Raise Asset to Power of Indicator (^)",
+        "Square Root of Asset Matrix (sqrt)"
+    ])
+    
+    # Feature 6: Indicator Settings Panel
+    st.sidebar.markdown("### ⚙️ Indicator Tuning Matrix")
+    indicator_period = st.sidebar.number_input("Indicator Lookback Window Length", min_value=1, max_value=500, value=14)
+    bb_std_dev = st.sidebar.number_input("Bollinger Band Standard Deviation Multiplier", min_value=0.1, max_value=5.0, value=2.0)
+    st_mult = st.sidebar.number_input("SuperTrend Volatility Multiplier", min_value=0.1, max_value=10.0, value=3.0)
 
     try:
-        df_daily_raw, df_weekly = load_capitulation_data()
-        if df_daily_raw is None or df_daily_raw.empty:
-            st.error("❌ Deep data streams unavailable right now. Try switching core engines.")
+        # Load structural asset data stream
+        df_play = fetch_legacy_market_data(playground_asset, playground_interval)
+        if df_play is None or df_play.empty:
+            st.error("❌ Target dataset empty. Verify connection or increase data bar limits.")
             st.stop()
             
-        df_daily = df_daily_raw.copy()
-        thresh = float(vol_input)
-        days_since_tracker = []
-        current_accumulator = 0
+        # Parse complete historical layout prior to slicing to avoid boundary distortion
+        df_play = df_play.copy().sort_index()
         
-        if thresh < 0:
-            running_peak = df_daily['high'].iloc[0]
-            for idx in range(len(df_daily)):
-                current_high = df_daily['high'].iloc[idx]
-                current_low = df_daily['low'].iloc[idx]
-                if current_high > running_peak: running_peak = current_high
-                drawdown_pct = ((current_low - running_peak) / running_peak) * 100.0
-                if drawdown_pct <= thresh:
-                    days_since_tracker.append(0)
-                    current_accumulator = 0
-                    running_peak = current_high
-                else:
-                    current_accumulator += 1
-                    days_since_tracker.append(current_accumulator)
-        else:
-            running_trough = df_daily['low'].iloc[0]
-            for idx in range(len(df_daily)):
-                current_high = df_daily['high'].iloc[idx]
-                current_low = df_daily['low'].iloc[idx]
-                if current_low < running_trough: running_trough = current_low
-                expansion_pct = ((current_high - running_trough) / running_trough) * 100.0
-                if expansion_pct >= thresh:
-                    days_since_tracker.append(0)
-                    current_accumulator = 0
-                    running_trough = current_low
-                else:
-                    current_accumulator += 1
-                    days_since_tracker.append(current_accumulator)
+        if "Simple Moving Average" in selected_indicator or "(SMA)" in selected_indicator:
+            ind_series = df_play['close'].rolling(window=int(indicator_period)).mean()
+        elif "Exponential Moving Average" in selected_indicator or "(EMA)" in selected_indicator:
+            ind_series = df_play['close'].ewm(span=int(indicator_period), adjust=False).mean()
+        elif "Weighted Moving Average" in selected_indicator or "(WMA)" in selected_indicator:
+            ind_series = calculate_wma(df_play['close'], int(indicator_period))
+        elif "Relative Strength Index" in selected_indicator or "(RSI)" in selected_indicator:
+            ind_series = calculate_rsi(df_play['close'], int(indicator_period))
+        elif "MACD Line" in selected_indicator:
+            ind_series = df_play['close'].ewm(span=12, adjust=False).mean() - df_play['close'].ewm(span=26, adjust=False).mean()
+        elif "Bollinger Bands" in selected_indicator:
+            ind_series = df_play['close'].rolling(window=int(indicator_period)).mean()
+        elif "SuperTrend" in selected_indicator:
+            ind_series = calculate_supertrend(df_play, int(indicator_period), st_mult)
+        elif "Average True Range" in selected_indicator or "(ATR)" in selected_indicator:
+            ind_series = calculate_atr(df_play, int(indicator_period))
+        elif "Volume Weighted Average Price" in selected_indicator or "(VWAP)" in selected_indicator:
+            ind_series = calculate_vwap(df_play)
+            
+        df_play['INDICATOR_VAL'] = ind_series
         
-        current_live_gap = days_since_tracker[-1]
-        clean_pattern = pattern_input.strip().upper()
-        candle_string_sequence = "".join(['G' if r >= 0 else 'R' for r in df_daily['return'].tolist()])
-        match_indices = [i + len(clean_pattern) for i in range(len(candle_string_sequence) - len(clean_pattern)) if candle_string_sequence[i : i + len(clean_pattern)] == clean_pattern]
+        # Apply precise timestamp coordinate window filtering 
+        t_start = pd.to_datetime(start_time_str.strip())
+        t_end = pd.to_datetime(end_time_str.strip())
+        df_filtered = df_play.loc[t_start:t_end]
         
+        if df_filtered.empty:
+            st.warning("⚠️ Filter Window Warning: The parsed date coordinates do not match any retrieved market timestamps inside the TradingView engine.")
+            st.stop()
+            
+        # Run calculation operations matrix
+        asset_close = df_filtered['close']
+        indicator_val = df_filtered['INDICATOR_VAL']
+        
+        if "Divide" in selected_op:
+            math_result = asset_close / (indicator_val + 1e-10)
+            op_label = "Asset / Indicator Ratio"
+        elif "Multiply" in selected_op:
+            math_result = asset_close * indicator_val
+            op_label = "Asset * Indicator Matrix"
+        elif "Subtract" in selected_op:
+            math_result = asset_close - indicator_val
+            op_label = "Asset - Indicator Spread"
+        elif "Add" in selected_op:
+            math_result = asset_close + indicator_val
+            op_label = "Asset + Indicator Cumulative"
+        elif "Raise" in selected_op:
+            math_result = asset_close ** indicator_val
+            op_label = "Asset ^ Indicator Exponential Power"
+        elif "Square Root" in selected_op:
+            math_result = np.sqrt(asset_close)
+            op_label = "√Asset Matrix Scaling"
+
+        # Matplotlib visualization rendering zone using custom color scheme layout guidelines (Red/Purple focus)
         plt.style.use('dark_background')
-        fig, (ax1, ax3) = plt.subplots(1, 2, figsize=(16, 6))
+        fig_play, (ax_main, ax_op) = plt.subplots(2, 1, figsize=(16, 10), sharex=True, gridspec_kw={'height_ratios': [2, 2]})
         
-        ax1.hist(df_daily['return'].dropna().values, bins=100, range=(-15, 15), color='#8a2be2', alpha=0.6, label='Daily Lifetime')
-        ax1.set_title("HISTOGRAM 1: TOTAL DAILY RETURN FREQUENCY", fontweight='bold', fontsize=10)
+        # Upper Canvas Segment: Target Price Action Baseline
+        ax_main.plot(df_filtered.index, asset_close, color='#8a2be2', linewidth=2.5, label=f"{playground_asset} Close Price")
+        if "ATR" not in selected_indicator and "RSI" not in selected_indicator and "MACD" not in selected_indicator:
+            ax_main.plot(df_filtered.index, indicator_val, color='#ff00ff', linewidth=1.5, linestyle='--', label=f"Overlayed {selected_indicator}")
+        ax_main.set_title(f"PRIMARY TRACKER: {playground_asset} ({playground_interval} Interval)", fontsize=11, fontweight='bold', color='#ffffff')
+        ax_main.legend(loc='upper left', facecolor='#111111', edgecolor='#333333')
+        ax_main.grid(True, color='#222222')
         
-        ax3.plot(df_daily.index, days_since_tracker, color='#00ffcc', linewidth=1.2, label='Days Since')
-        ax3.fill_between(df_daily.index, 0, days_since_tracker, color='#00ffcc', alpha=0.06)
-        ax3.set_title("CHART 2: STRUCTURAL RESETS TIMELINE WAVE", fontweight='bold', fontsize=10)
+        # Lower Canvas Segment: Mathematical Engine Result
+        ax_op.plot(df_filtered.index, math_result, color='#ff0055', linewidth=3, label=f"Calculated: {op_label}")
+        ax_op.fill_between(df_filtered.index, math_result, math_result.mean(), color='#ff0055', alpha=0.08)
+        ax_op.axhline(math_result.mean(), color='#ffffff', linestyle=':', alpha=0.6, label=f"Mean Baseline ({math_result.mean():.2f})")
+        ax_op.set_title(f"QUANT ENGINE OUTPUT: {op_label}", fontsize=11, fontweight='bold', color='#ffffff')
+        ax_op.legend(loc='upper left', facecolor='#111111', edgecolor='#333333')
+        ax_op.grid(True, color='#222222')
         
         plt.tight_layout(pad=3.0)
-        st.pyplot(fig)
+        st.pyplot(fig_play)
         
-        st.subheader("📊 Performance Summary Matrix")
-        metrics_data = {
-            "Timeframe Segment": ["Daily Changes", "Weekly Changes"],
-            "Lifetime History Average": [f"{df_daily['return'].mean():+.4f}%", f"{df_weekly['return'].mean():+.4f}%" if df_weekly is not None else "N/A"],
-            "US Midterm Cycles Only": [f"{df_daily[df_daily['is_midterm']]['return'].mean():+.4f}%", f"{df_weekly[df_weekly['is_midterm']]['return'].mean():+.4f}%" if df_weekly is not None else "N/A"]
-        }
-        st.table(pd.DataFrame(metrics_data))
+        # Performance matrix monitoring deck
+        st.subheader("📊 Quant Wave Performance Matrix")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Final Formula Coordinate", f"{math_result.iloc[-1]:,.4f}")
+        col2.metric("Matrix Peak High", f"{math_result.max():,.4f}")
+        col3.metric("Matrix Cycle Low", f"{math_result.min():,.4f}")
         
-        col1, col2 = st.columns(2)
-        col1.metric("Current Days Stretched Under Matrix", f"{current_live_gap} Days")
-        col2.metric(f"Historical '{clean_pattern}' Frequency Discoveries", f"{len(match_indices)} Matches")
     except Exception as ex:
-        st.error(f"Execution Error: {ex}")
+        st.error(f"Playground Compilation Fault: {ex}")
 
 st.divider()
 st.markdown("<p style='text-align: center; color: #555555;'>--- Model By HRF ---</p>", unsafe_allow_html=True)
