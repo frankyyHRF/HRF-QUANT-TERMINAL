@@ -367,6 +367,7 @@ if app_mode == "Algorithmic Fractal Scan":
                         scaled_full_boosted = scaled_full * (1.0 + (vol_boost_pct / 100.0))
                         ax1.plot(scaled_full_boosted, linestyle='--', alpha=0.5, label=f"#{idx+1} {row['asset_name']} ({row['date_str']})")
                 
+                # --- FIXED LINE BELOW (CLEANED SYNTAX CONFLICT) ---
                 if mean_path_array is not None and isolate_clean in ['all', 'mean']:
                     if std_dev_multiplier > 0:
                         std_path = np.std(stacked_paths * (1.0 + (vol_boost_pct / 100.0)), axis=0)
