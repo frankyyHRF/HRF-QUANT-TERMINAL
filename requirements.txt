@@ -3,6 +3,7 @@ numpy
 matplotlib
 scipy
 fastdtw
+plotly
 git+https://github.com/rongardF/tvDatafeed.git
 
 
