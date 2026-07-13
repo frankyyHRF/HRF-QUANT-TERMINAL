@@ -2,9 +2,12 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 from tvDatafeed import TvDatafeed, Interval
 
+# ==============================================================================
 # --- UNIFIED SYSTEM INITIALIZATION ---
+# ==============================================================================
 st.set_page_config(page_title="HRF QUANT PLATFORM", layout="wide")
 
 # Inject deep dark-mode styling variables for mobile UI clarity
@@ -20,13 +23,13 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🏛️ HRF QUANT MASTER PLATFORM V5.0")
-st.caption("TradingView Core Multi-Engine — Model By HRF")
+st.caption("The Complete Unified Multi-Engine Ecosystem — Model By HRF")
 st.divider()
 
-# --- NAVIGATION (TECHNICAL INDICATORS MATRIX DELETED) ---
+# --- CENTRAL HUB NAVIGATION ---
 app_mode = st.sidebar.selectbox(
     "🚀 Choose Analysis Core Engine", 
-    ["Algorithmic Fractal Scan", "Structural Capitulation Wave"]
+    ["Algorithmic Fractal Scan", "Structural Capitulation Wave", "Statistical Framework Core"]
 )
 
 # Expanded TradingView Ticker Mapping Range
@@ -117,9 +120,9 @@ def calculate_custom_indicators(df, cfg):
     ema_slow = close.ewm(span=cfg['macd_s'], adjust=False).mean()
     df['MACD'] = ema_fast - ema_slow
     
-    # Bollinger Bands (Middle, Upper, Lower)
+    # Bollinger Bands
     df['BB_Mid'] = close.rolling(window=cfg['bb_p']).mean()
-    bb_std = close.rolling(window=cfg['bb_p']).stdev() if hasattr(close.rolling(window=cfg['bb_p']), 'stdev') else close.rolling(window=cfg['bb_p']).std()
+    bb_std = close.rolling(window=cfg['bb_p']).std()
     df['BB_Upper'] = df['BB_Mid'] + (cfg['bb_std'] * bb_std)
     df['BB_Lower'] = df['BB_Mid'] - (cfg['bb_std'] * bb_std)
     
@@ -163,6 +166,21 @@ def calculate_rolling_correlation(series_a, series_b, lookback_window):
     df['Ret_A'] = df['Target_Curve'].pct_change()
     df['Ret_C'] = df['Match_Curve'].pct_change()
     return df['Ret_A'].rolling(window=int(lookback_window)).corr(df['Ret_C']).fillna(0.0).tolist()
+
+# PATH-DEPENDENT LOCAL HIGH RESET DRAWDOWN LOGIC
+def calculate_hrf_path_drawdown(price_series):
+    prices = np.array(price_series)
+    n = len(prices)
+    drawdowns = np.zeros(n)
+    if n == 0: return drawdowns
+    current_local_high = prices[0]
+    for i in range(1, n):
+        if prices[i] >= current_local_high:
+            current_local_high = prices[i]
+            drawdowns[i] = 0.0
+        else:
+            drawdowns[i] = (prices[i] - current_local_high) / current_local_high
+    return drawdowns
 
 # ==============================================================================
 # ENGINE MODULE 1: ALGORITHMIC FRACTAL SCANNER
@@ -352,6 +370,7 @@ if app_mode == "Algorithmic Fractal Scan":
                 if mean_path_array is not None and isolate_clean in ['all', 'mean']:
                     if std_dev_multiplier > 0:
                         std_path = np.std(stacked_paths * (1.0 + (vol_boost_pct / 100.0)), axis=0)
+                        ax1.fill_between(range(len(mean_path_array)), mean_path_array - (std_path * std_dev_multiplier), mean_path_array + (std_path * std_dev_multiplier), color='#ff00ff', alpha=0.1: text instead
                         ax1.fill_between(range(len(mean_path_array)), mean_path_array - (std_path * std_dev_multiplier), mean_path_array + (std_path * std_dev_multiplier), color='#ff00ff', alpha=0.1)
                     ax1.plot(mean_path_array, color='#ff00ff', linewidth=4, label='COMPOSITE FRACTAL MEAN (Excluding 2026)', zorder=6)
                 ax1.axvline(x=target_bars_num - 1, color='#ffffff', linestyle=':', alpha=0.5)
@@ -380,31 +399,27 @@ if app_mode == "Algorithmic Fractal Scan":
         st.error(f"Ecosystem halted: {e}")
 
 # ==============================================================================
-# ENGINE MODULE 2: REBUILT STRUCTURAL CAPITULATION & OPERATIONS WAVE
+# ENGINE MODULE 2: STRUCTURAL CAPITULATION & MATHEMATICAL OPERATIONS ENGINE
 # ==============================================================================
 elif app_mode == "Structural Capitulation Wave":
     st.header("⏱️ Structural Capitulation Wave & Mathematical Matrix")
     
-    # Core Feature UI Inputs
     stat_asset = st.sidebar.selectbox("Asset", list(ticker_map.keys()), index=0)
     stat_interval = st.sidebar.selectbox("Time Interval", ['1m', '5m', '15m', '1h', '4h', '1day', '1 week', '1month'], index=3)
     
-    # Time Frame Inputs
     start_time_str = st.sidebar.text_input("Time Frame Start (YYYY-MM-DD:HH:MM)", value="2026-01-01:00:00")
     end_time_str = st.sidebar.text_input("Time Frame End (YYYY-MM-DD:HH:MM)", value="2026-07-14:00:00")
     
-    # Structural Calculation Indicators and Custom Matrix Ops
     target_indicator = st.sidebar.selectbox(
-        "Indicators", 
+        "Indicators Matrix Selection", 
         ["Moving Average (Simple)", "Moving Average (Exponential)", "Moving Average (Weighted)", "RSI", "MACD", "Bollinger Band (Middle)", "Super Trend", "ATR", "VWAP"]
     )
     
     target_operation = st.sidebar.selectbox(
-        "Operations", 
+        "Mathematical Programmatic Operations", 
         ["None (Just Plot Asset & Indicator)", "Add (+)", "Subtract (-)", "Multiply (*)", "Divide (/)", "Power (^)", "Square Root (√)"]
     )
     
-    # Real-time Indicators Dynamic Configuration Layer
     with st.sidebar.expander("⚙️ Indicator Core Settings Parameters"):
         sma_p = st.number_input("Simple Moving Average Length", value=20, min_value=1)
         ema_p = st.number_input("Exponential Moving Average Length", value=20, min_value=1)
@@ -424,16 +439,13 @@ elif app_mode == "Structural Capitulation Wave":
     }
 
     try:
-        # Load raw asset metrics history
         df_raw = fetch_legacy_market_data(stat_asset, stat_interval)
         if df_raw is None or df_raw.empty:
             st.error("❌ Deep data stream failed to initiate for the selected parameters.")
             st.stop()
             
-        # Parse indicator arrays natively
         df_calculated = calculate_custom_indicators(df_raw.copy(), indicator_config)
         
-        # Map string parameters cleanly to structural series keys
         ind_key_map = {
             "Moving Average (Simple)": "SMA", "Moving Average (Exponential)": "EMA", "Moving Average (Weighted)": "WMA",
             "RSI": "RSI", "MACD": "MACD", "Bollinger Band (Middle)": "BB_Mid", "Super Trend": "SuperTrend",
@@ -441,7 +453,6 @@ elif app_mode == "Structural Capitulation Wave":
         }
         selected_ind_col = ind_key_map[target_indicator]
         
-        # Safe Date String Parsing Layer
         def parse_custom_date(dt_str):
             try:
                 parts = dt_str.strip().split(':')
@@ -455,13 +466,11 @@ elif app_mode == "Structural Capitulation Wave":
         start_dt = parse_custom_date(start_time_str)
         end_dt = parse_custom_date(end_time_str)
         
-        # Slicing time series boundaries cleanly
         df_filtered = df_calculated.loc[start_dt:end_dt].copy()
         if df_filtered.empty:
             st.error("⚠️ Filter Error: No timeline entries found matching those specific coordinate blocks.")
             st.stop()
             
-        # Execute Selected Programmatic Algebraic Operations Layer
         asset_val = df_filtered['close']
         ind_val = df_filtered[selected_ind_col]
         
@@ -487,7 +496,6 @@ elif app_mode == "Structural Capitulation Wave":
             output_curve = np.sqrt(asset_val.abs())
             op_title = "Absolute Asset Vector Square Root (√)"
 
-        # Vibrant Core Layout Visualization Layer
         plt.style.use('dark_background')
         
         if target_operation == "None (Just Plot Asset & Indicator)":
@@ -500,14 +508,12 @@ elif app_mode == "Structural Capitulation Wave":
         else:
             fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 9), sharex=True, gridspec_kw={'height_ratios': [2, 1.5]})
             
-            # Subplot 1: Raw Metrics Components
             ax1.plot(df_filtered.index, asset_val, color='#9400d3', linewidth=2.5, label=f"Asset Close ({stat_asset})")
             ax1.plot(df_filtered.index, ind_val, color='#ffffff', linewidth=1.5, linestyle=":", label=f"Indicator ({target_indicator})")
             ax1.set_title(f"STRUCTURAL CAPITULATION WAVE COMPONENTS", color='#ff007f', fontweight='bold', fontsize=11)
             ax1.grid(True, color='#222222', alpha=0.4)
             ax1.legend(loc='upper left', facecolor='#111111')
             
-            # Subplot 2: Resulting Dynamic Transformation Output Wave
             ax2.plot(df_filtered.index, output_curve, color='#ff0055', linewidth=3.0, label=op_title)
             ax2.fill_between(df_filtered.index, output_curve, output_curve.mean(), color='#9400d3', alpha=0.12)
             ax2.set_title(f"ALGEBRAIC OUTPUT COEFFICIENT WAVE", color='#ffffff', fontweight='bold', fontsize=10)
@@ -517,10 +523,7 @@ elif app_mode == "Structural Capitulation Wave":
         plt.tight_layout(pad=2.0)
         st.pyplot(fig)
         
-        # Display Quantitative Summary States
         st.subheader(f"📊 Matrix Metrics Sheet ({stat_asset} Engine Processing)")
-        latest_idx = df_filtered.index[-1]
-        
         c1, c2, c3 = st.columns(3)
         c1.metric("Asset Execution Price", f"${asset_val.iloc[-1]:,.2f}")
         c2.metric(f"Active {selected_ind_col} Terminal", f"{ind_val.iloc[-1]:,.4f}")
@@ -529,5 +532,79 @@ elif app_mode == "Structural Capitulation Wave":
     except Exception as ex:
         st.error(f"Execution Error inside Statistical Pipeline Horizon: {ex}")
 
+# ==============================================================================
+# ENGINE MODULE 3: STATISTICAL FRAMEWORK CORE (PATH RESET DRAWDOWN)
+# ==============================================================================
+elif app_mode == "Statistical Framework Core":
+    st.header("📈 Path-Dependent Statistical Framework Engine")
+    
+    stat_asset = st.sidebar.selectbox("Select Target Framework Asset", list(ticker_map.keys()), index=0)
+    stat_interval = st.sidebar.selectbox("Framework Time Interval", ['1m', '5m', '15m', '1h', '4h', '1day', '1 week', '1month'], index=5)
+    
+    start_time_str = st.sidebar.text_input("Frame Start (YYYY-MM-DD)", value="2025-01-01")
+    end_time_str = st.sidebar.text_input("Frame End (YYYY-MM-DD)", value="2026-07-14")
+    
+    try:
+        df_raw = fetch_legacy_market_data(stat_asset, stat_interval)
+        if df_raw is None or df_raw.empty:
+            st.error("❌ Deep data stream failed to initiate for the statistical framework.")
+            st.stop()
+            
+        start_dt = pd.to_datetime(start_time_str)
+        end_dt = pd.to_datetime(end_time_str)
+        
+        df_filtered = df_raw.loc[start_dt:end_dt].copy()
+        if df_filtered.empty:
+            st.error("⚠️ Filter Error: No timeline records match your frame filters.")
+            st.stop()
+            
+        # Run custom conditional path drawdown logic
+        df_filtered['HRF_Drawdown'] = calculate_hrf_path_drawdown(df_filtered['close'])
+        
+        # Build Interactive Multi-Axis Chart Suite
+        fig = go.Figure()
+        
+        # Main Price Track (Vibrant Purple)
+        fig.add_trace(go.Scatter(
+            x=df_filtered.index, 
+            y=df_filtered['close'],
+            mode='lines',
+            name=f'{stat_asset} Price',
+            line=dict(color='#8A2BE2', width=2.5)
+        ))
+        
+        # Path Drawdown Layer (Vibrant Red)
+        fig.add_trace(go.Scatter(
+            x=df_filtered.index, 
+            y=df_filtered['HRF_Drawdown'] * 100,
+            mode='lines',
+            name='Path-Dependent Drawdown (%)',
+            line=dict(color='#FF0055', width=1.5),
+            yaxis='y2'
+        ))
+        
+        fig.update_layout(
+            title=f"<b>{stat_asset} Framework - Model By HRF</b>",
+            xaxis=dict(title="Timeline Series", gridcolor='#222222'),
+            yaxis=dict(title="Asset Price ($)", side="left", gridcolor='#222222'),
+            yaxis2=dict(title="Conditional Drawdown (%)", side="right", overlaying="y", showgrid=False, range=[-100, 5]),
+            template="plotly_dark",
+            paper_bgcolor='#0d0d11',
+            plot_bgcolor='#0d0d11',
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Micro Summary Block
+        st.subheader("📊 Path Analysis Metrics")
+        m1, m2 = st.columns(2)
+        m1.metric("Current Asset Close", f"${df_filtered['close'].iloc[-1]:,.2f}")
+        m2.metric("Max Trapped Path Drawdown", f"{df_filtered['HRF_Drawdown'].min() * 100:.2f}%")
+        
+    except Exception as ex:
+        st.error(f"Ecosystem failed inside statistical block calculations: {ex}")
+
+# Global Watermark Footer
 st.divider()
 st.markdown("<p style='text-align: center; color: #555555;'>--- Model By HRF ---</p>", unsafe_allow_html=True)
