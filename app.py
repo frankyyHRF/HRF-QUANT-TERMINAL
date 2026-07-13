@@ -19,12 +19,15 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🏛️ HRF QUANT MASTER PLATFORM V4.0")
-st.caption("TradingView Market Core Engine — Model By HRF")
+st.title("🏛️ HRF QUANT MASTER PLATFORM V5.0")
+st.caption("TradingView Core Multi-Engine — Model By HRF")
 st.divider()
 
 # --- NAVIGATION ---
-app_mode = st.sidebar.selectbox("🚀 Choose Analysis Core Engine", ["Algorithmic Fractal Scan", "Structural Capitulation Wave"])
+app_mode = st.sidebar.selectbox(
+    "🚀 Choose Analysis Core Engine", 
+    ["Algorithmic Fractal Scan", "Structural Capitulation Wave", "Technical Indicators Matrix"]
+)
 
 # Expanded TradingView Ticker Mapping Range
 ticker_map = {
@@ -62,7 +65,6 @@ def get_election_regime(year):
 def fetch_legacy_market_data(asset_name, interval_str):
     symbol, exchange = ticker_map.get(asset_name, ('BTCUSD', 'BINANCE'))
     
-    # Map the interface options back to TradingView Intervals
     interval_dict = {
         '1M': Interval.in_monthly,
         '1w': Interval.in_weekly,
@@ -77,12 +79,10 @@ def fetch_legacy_market_data(asset_name, interval_str):
         
     try:
         tv = TvDatafeed()
-        # Request a highly optimized row count for calculations
         df = tv.get_hist(symbol=symbol, exchange=exchange, interval=tv_interval, n_bars=4000)
         if df is None or df.empty: return None
         
         df.index.name = 'time'
-        # Standardize naming cases for model execution
         df.rename(columns={'open': 'open', 'high': 'high', 'low': 'low', 'close': 'close', 'volume': 'volume'}, inplace=True)
         return df[['open', 'high', 'low', 'close', 'volume']]
     except:
@@ -102,7 +102,7 @@ def calculate_rolling_correlation(series_a, series_b, lookback_window):
     return df['Ret_A'].rolling(window=int(lookback_window)).corr(df['Ret_C']).fillna(0.0).tolist()
 
 # ==============================================================================
-# MAIN CORE: ENGINE MODULE 1 (FRACTAL SCANNER)
+# ENGINE MODULE 1: ALGORITHMIC FRACTAL SCANNER
 # ==============================================================================
 if app_mode == "Algorithmic Fractal Scan":
     st.header("🎯 TradingView Core Fractal Scanner")
@@ -148,7 +148,7 @@ if app_mode == "Algorithmic Fractal Scan":
     try:
         df_target = fetch_legacy_market_data(t_asset, i_choice)
         if df_target is None or df_target.empty:
-            st.error("❌ Data download error from TradingView backend systems. Retry executing pipeline.")
+            st.error("❌ Data download error from TradingView backend systems.")
             st.stop()
             
         close_target = df_target['close'].dropna()
@@ -179,7 +179,7 @@ if app_mode == "Algorithmic Fractal Scan":
             fig_frac, ax1 = plt.subplots(1, 1, figsize=(16, 8))
             ax2 = None
             
-        ax1.plot(target_scaled, color='#00ffcc', linewidth=4, label=f'TARGET: {t_asset} (Baseline)', zorder=5)
+        ax1.plot(target_scaled, color='#00ffcc', linewidth=4, label=f'TARGET: {t_asset} ({i_choice})', zorder=5)
         
         if f_mode == "Manual Compare":
             starts = [s.strip() for s in ov_starts.split(',') if s.strip()]
@@ -208,8 +208,8 @@ if app_mode == "Algorithmic Fractal Scan":
                 m_std = np.std(manual_matrix_boosted, axis=0)
                 
                 if std_dev_multiplier > 0:
-                    ax1.fill_between(range(len(m_mean)), m_mean - (m_std * std_dev_multiplier), m_mean + (m_std * std_dev_multiplier), color='#ffff00', alpha=0.12)
-                ax1.plot(m_mean, color='#ffff00', linewidth=4, label='MANUAL COMPOSITE MEAN TRACK', zorder=6)
+                    ax1.fill_between(range(len(m_mean)), m_mean - (m_std * std_dev_multiplier), m_mean + (m_std * std_dev_multiplier), color='#ff00ff', alpha=0.12)
+                ax1.plot(m_mean, color='#ff00ff', linewidth=4, label='MANUAL COMPOSITE MEAN TRACK', zorder=6)
 
         else:
             assets_to_scan = list(ticker_map.keys()) if s_pool == "All Assets" else [s_pool]
@@ -289,18 +289,18 @@ if app_mode == "Algorithmic Fractal Scan":
                 if mean_path_array is not None and isolate_clean in ['all', 'mean']:
                     if std_dev_multiplier > 0:
                         std_path = np.std(stacked_paths * (1.0 + (vol_boost_pct / 100.0)), axis=0)
-                        ax1.fill_between(range(len(mean_path_array)), mean_path_array - (std_path * std_dev_multiplier), mean_path_array + (std_path * std_dev_multiplier), color='#ffff00', alpha=0.1)
-                    ax1.plot(mean_path_array, color='#ffff00', linewidth=4, label='COMPOSITE FRACTAL MEAN (Excluding 2026)', zorder=6)
+                        ax1.fill_between(range(len(mean_path_array)), mean_path_array - (std_path * std_dev_multiplier), mean_path_array + (std_path * std_dev_multiplier), color='#ff00ff', alpha=0.1)
+                    ax1.plot(mean_path_array, color='#ff00ff', linewidth=4, label='COMPOSITE FRACTAL MEAN (Excluding 2026)', zorder=6)
                 ax1.axvline(x=target_bars_num - 1, color='#ffffff', linestyle=':', alpha=0.5)
 
                 if enable_corr and ax2 is not None and mean_path_array is not None:
                     r_wave = calculate_rolling_correlation(target_scaled, mean_path_array, c_win)
-                    ax2.plot(r_wave, color='#ffff00', linewidth=2.5, label=f"Rolling {c_win}-Bar Correlation")
+                    ax2.plot(r_wave, color='#ff00ff', linewidth=2.5, label=f"Rolling {c_win}-Bar Correlation")
                     ax2.fill_between(range(len(r_wave)), r_wave, 0, where=(np.array(r_wave) >= 0), color='#00ff88', alpha=0.15)
                     ax2.fill_between(range(len(r_wave)), r_wave, 0, where=(np.array(r_wave) < 0), color='#ff0055', alpha=0.15)
 
         ax1.axhline(y=0.0, color='#555555', linestyle='-', linewidth=1.2)
-        ax1.set_title("HRF MATRIX ENGINE — UNIFIED CRYPTO CORE CANVAS", color='#ffffff', fontsize=12, fontweight='bold')
+        ax1.set_title("HRF MATRIX ENGINE — Model By HRF", color='#ffffff', fontsize=12, fontweight='bold')
         ax1.set_ylabel("Percentage Performance Shift (%)")
         ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:+.1f}%'))
         ax1.legend(loc='upper left', facecolor='#111111', edgecolor='#333333')
@@ -317,41 +317,63 @@ if app_mode == "Algorithmic Fractal Scan":
         st.error(f"Ecosystem halted: {e}")
 
 # ==============================================================================
-# ENGINE MODULE 2: CAPITULATION & DAYS SINCE RESET ENGINE
+# ENGINE MODULE 2: REBUILT STATISTICAL ENGINE (CAPITULATION & RESET WAVE)
 # ==============================================================================
-else:
+elif app_mode == "Structural Capitulation Wave":
     st.header("⏱️ Path-Dependent Peak-To-Trough Reset Wave")
+    
+    # NEW REBUILT CORE SELECTION CAPABILITIES
+    stat_asset = st.sidebar.selectbox("Statistical Focus Target Asset", list(ticker_map.keys()), index=0)
+    stat_interval = st.sidebar.selectbox("Statistical Horizon Time Interval", ['1M', '1w', '1d', '4h', '1h', '15m', '5m', '1m'], index=2)
+    
     vol_input = st.sidebar.text_input("Volatility Reset Threshold (%)", value="-40.0")
     pattern_input = st.sidebar.text_input("Candle Sequence Pattern (G/R)", value="RRGG")
     
-    @st.cache_data(show_spinner="🔄 Loading Lifetime Public Archive Pools...")
-    def load_capitulation_data():
-        df_d = fetch_legacy_market_data("Bitcoin (BTC)", "1d")
-        df_w = fetch_legacy_market_data("Bitcoin (BTC)", "1w")
-        
-        for df in [df_d, df_w]:
-            if df is not None:
-                df['return'] = ((df['close'] - df['open']) / df['open']) * 100.0
-                df['is_midterm'] = (df.index.year % 4 == 2)
-        return df_d, df_w
+    # NEW % CHANGE N-BAR CONFIGURATION
+    n_bars_pct = st.sidebar.text_input("Calculate % Change Over N-Bars", value="1")
+    stat_year_filter = st.sidebar.text_input("Restrict Statistical View to Specific Year (or 'all')", value="all")
 
     try:
-        df_daily_raw, df_weekly = load_capitulation_data()
-        if df_daily_raw is None or df_daily_raw.empty:
-            st.error("❌ Deep data streams unavailable right now. Try switching core engines.")
+        thresh = float(vol_input)
+        n_pct = int(n_bars_pct)
+    except ValueError:
+        st.error("⚠️ Dynamic Variable Error: Verify parameters contain clean mathematical integers.")
+        st.stop()
+        
+    @st.cache_data(show_spinner="🔄 Fetching Selected Assets Over Active Pipeline Horizon...")
+    def load_dynamic_statistical_data(asset_name, interval_str, n_bars_lookback):
+        df = fetch_legacy_market_data(asset_name, interval_str)
+        if df is not None:
+            # Custom % Change over N-bars formula
+            df['return'] = df['close'].pct_change(periods=n_bars_lookback) * 100.0
+            df['is_midterm'] = (df.index.year % 4 == 2)
+        return df
+
+    try:
+        df_stat_raw = load_dynamic_statistical_data(stat_asset, stat_interval, n_pct)
+        if df_stat_raw is None or df_stat_raw.empty:
+            st.error("❌ Deep data stream failed to initiate for the selected parameters.")
             st.stop()
             
-        df_daily = df_daily_raw.copy()
-        thresh = float(vol_input)
+        df_stat = df_stat_raw.dropna(subset=['return']).copy()
+        
+        # Apply strict calendar year boundaries if specified
+        clean_yr = stat_year_filter.strip().lower()
+        if clean_yr != 'all' and clean_yr.isdigit():
+            df_stat = df_stat[df_stat.index.year == int(clean_yr)]
+            if df_stat.empty:
+                st.warning(f"No pricing historical points available for year matching: {clean_yr}")
+                st.stop()
+
         days_since_tracker = []
         current_accumulator = 0
         
-        # --- CONDITIONAL PATH-DEPENDENT RESET LOGIC (LOCAL RESET RULES) ---
+        # --- CONDITIONAL PATH-DEPENDENT RESET LOGIC ---
         if thresh < 0:
-            running_peak = df_daily['high'].iloc[0]
-            for idx in range(len(df_daily)):
-                current_high = df_daily['high'].iloc[idx]
-                current_low = df_daily['low'].iloc[idx]
+            running_peak = df_stat['high'].iloc[0]
+            for idx in range(len(df_stat)):
+                current_high = df_stat['high'].iloc[idx]
+                current_low = df_stat['low'].iloc[idx]
                 
                 if current_high > running_peak: 
                     running_peak = current_high
@@ -361,15 +383,15 @@ else:
                 if drawdown_pct <= thresh:
                     days_since_tracker.append(0)
                     current_accumulator = 0
-                    running_peak = current_high  # Path-dependent reset to local window state
+                    running_peak = current_high  
                 else:
                     current_accumulator += 1
                     days_since_tracker.append(current_accumulator)
         else:
-            running_trough = df_daily['low'].iloc[0]
-            for idx in range(len(df_daily)):
-                current_high = df_daily['high'].iloc[idx]
-                current_low = df_daily['low'].iloc[idx]
+            running_trough = df_stat['low'].iloc[0]
+            for idx in range(len(df_stat)):
+                current_high = df_stat['high'].iloc[idx]
+                current_low = df_stat['low'].iloc[idx]
                 
                 if current_low < running_trough: 
                     running_trough = current_low
@@ -379,42 +401,117 @@ else:
                 if expansion_pct >= thresh:
                     days_since_tracker.append(0)
                     current_accumulator = 0
-                    running_trough = current_low  # Path-dependent reset to local window state
+                    running_trough = current_low  
                 else:
                     current_accumulator += 1
                     days_since_tracker.append(current_accumulator)
         
-        current_live_gap = days_since_tracker[-1]
+        current_live_gap = days_since_tracker[-1] if days_since_tracker else 0
         clean_pattern = pattern_input.strip().upper()
-        candle_string_sequence = "".join(['G' if r >= 0 else 'R' for r in df_daily['return'].tolist()])
+        candle_string_sequence = "".join(['G' if r >= 0 else 'R' for r in df_stat['return'].tolist()])
         match_indices = [i + len(clean_pattern) for i in range(len(candle_string_sequence) - len(clean_pattern)) if candle_string_sequence[i : i + len(clean_pattern)] == clean_pattern]
         
+        # VIBRANT VISUAL THEME (RED & PURPLE MATRIX COLORS)
         plt.style.use('dark_background')
         fig, (ax1, ax3) = plt.subplots(1, 2, figsize=(16, 6))
         
-        ax1.hist(df_daily['return'].dropna().values, bins=100, range=(-15, 15), color='#8a2be2', alpha=0.6, label='Daily Lifetime')
-        ax1.set_title("HISTOGRAM 1: TOTAL DAILY RETURN FREQUENCY", fontweight='bold', fontsize=10)
+        ax1.hist(df_stat['return'].values, bins=100, color='#9400d3', alpha=0.6, edgecolor='#ff007f', label=f'{stat_asset} Ret Distribution')
+        ax1.set_title(f"HISTOGRAM: {n_bars_pct}-BAR DISTRIBUTION SHIFT", color='#ff007f', fontweight='bold', fontsize=10)
+        ax1.grid(True, color='#222222', alpha=0.5)
         
-        ax3.plot(df_daily.index, days_since_tracker, color='#00ffcc', linewidth=1.2, label='Days Since')
-        ax3.fill_between(df_daily.index, 0, days_since_tracker, color='#00ffcc', alpha=0.06)
-        ax3.set_title("CHART 2: STRUCTURAL RESETS TIMELINE WAVE", fontweight='bold', fontsize=10)
+        ax3.plot(df_stat.index, days_since_tracker, color='#ff0055', linewidth=1.5, label='Bars Since Reset')
+        ax3.fill_between(df_stat.index, 0, days_since_tracker, color='#9400d3', alpha=0.15)
+        ax3.set_title("CHART: PATH-DEPENDENT DYNAMIC TIMELINE WAVE", color='#ff007f', fontweight='bold', fontsize=10)
+        ax3.grid(True, color='#222222', alpha=0.5)
         
         plt.tight_layout(pad=3.0)
         st.pyplot(fig)
         
-        st.subheader("📊 Performance Summary Matrix")
+        st.subheader(f"📊 Performance Summary Matrix ({stat_asset} @ {stat_interval})")
         metrics_data = {
-            "Timeframe Segment": ["Daily Changes", "Weekly Changes"],
-            "Lifetime History Average": [f"{df_daily['return'].mean():+.4f}%", f"{df_weekly['return'].mean():+.4f}%" if df_weekly is not None else "N/A"],
-            "US Midterm Cycles Only": [f"{df_daily[df_daily['is_midterm']]['return'].mean():+.4f}%", f"{df_weekly[df_weekly['is_midterm']]['return'].mean():+.4f}%" if df_weekly is not None else "N/A"]
+            "Statistical Set Grouping": [f"Selected Series (Lookback: {n_bars_pct} Bars)", "US Midterm Cycle Periods"],
+            "Calculated Average Returns": [f"{df_stat['return'].mean():+.4f}%", f"{df_stat[df_stat['is_midterm']]['return'].mean():+.4f}%"],
+            "Standard Deviation Variance": [f"{df_stat['return'].std():.4f}%", f"{df_stat[df_stat['is_midterm']]['return'].std():.4f}%"]
         }
         st.table(pd.DataFrame(metrics_data))
         
         col1, col2 = st.columns(2)
-        col1.metric("Current Days Stretched Under Matrix", f"{current_live_gap} Days")
-        col2.metric(f"Historical '{clean_pattern}' Frequency Discoveries", f"{len(match_indices)} Matches")
+        col1.metric("Current Window Elongation Run", f"{current_live_gap} Bars")
+        col2.metric(f"Sequential Pattern '{clean_pattern}' Identifications", f"{len(match_indices)} Matches")
     except Exception as ex:
-        st.error(f"Execution Error: {ex}")
+        st.error(f"Execution Error inside Statistical Pipeline: {ex}")
+
+# ==============================================================================
+# ENGINE MODULE 3: RESTORED TECHNICAL INDICATORS MATRIX
+# ==============================================================================
+else:
+    st.header("⚡ Core Technical Analysis Indicators Matrix")
+    
+    ind_asset = st.sidebar.selectbox("Indicators Target Asset Focus", list(ticker_map.keys()), index=0)
+    ind_interval = st.sidebar.selectbox("Indicators Framework Interval", ['1M', '1w', '1d', '4h', '1h', '15m', '5m', '1m'], index=2)
+    
+    ma_fast = st.sidebar.text_input("Fast Moving Average Parameter", value="20")
+    ma_slow = st.sidebar.text_input("Slow Moving Average Parameter", value="50")
+    rsi_window = st.sidebar.text_input("Relative Strength Index Lookback", value="14")
+    
+    try:
+        fast_w = int(ma_fast)
+        slow_w = int(ma_slow)
+        rsi_w = int(rsi_window)
+    except ValueError:
+        st.error("Input Warning: Verify moving average fields contain numeric context strings.")
+        st.stop()
+        
+    try:
+        df_ind = fetch_legacy_market_data(ind_asset, ind_interval)
+        if df_ind is None or df_ind.empty:
+            st.error("❌ Data retrieval breakdown within TradingView endpoints framework.")
+            st.stop()
+            
+        # Calculation Layers
+        df_ind['Fast_MA'] = df_ind['close'].rolling(window=fast_w).mean()
+        df_ind['Slow_MA'] = df_ind['close'].rolling(window=slow_w).mean()
+        
+        # Relative Strength Formula
+        delta = df_ind['close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=rsi_w).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=rsi_w).mean()
+        rs = gain / loss
+        df_ind['RSI'] = 100 - (100 / (1 + rs))
+        
+        plt.style.use('dark_background')
+        fig_ind, (ax_p, ax_r) = plt.subplots(2, 1, figsize=(16, 10), sharex=True, gridspec_kw={'height_ratios': [2.5, 1]})
+        
+        # Panel 1 - Price Action Tracks
+        ax_p.plot(df_ind.index, df_ind['close'], color='#ffffff', linewidth=2.0, label=f'Price Close ({ind_asset})')
+        ax_p.plot(df_ind.index, df_ind['Fast_MA'], color='#ff00ff', linewidth=1.5, linestyle='--', label=f'Fast MA ({fast_w})')
+        ax_p.plot(df_ind.index, df_ind['Slow_MA'], color='#8a2be2', linewidth=1.5, label=f'Slow MA ({slow_w})')
+        ax_p.set_title("TECHNICAL PRICE METRICS CORE TRACKS", fontweight='bold', color='#ffffff')
+        ax_p.set_ylabel("Asset Unit Denomination Value")
+        ax_p.legend(loc='upper left', facecolor='#111111')
+        ax_p.grid(True, color='#222222')
+        
+        # Panel 2 - RSI Track
+        ax_r.plot(df_ind.index, df_ind['RSI'], color='#ff0055', linewidth=1.8, label=f'RSI ({rsi_w})')
+        ax_r.axhline(70, color='#ff0055', linestyle=':', alpha=0.7)
+        ax_r.axhline(30, color='#00ffcc', linestyle=':', alpha=0.7)
+        ax_r.fill_between(df_ind.index, 70, 30, color='#8a2be2', alpha=0.04)
+        ax_r.set_ylabel("RSI Gauge Bounds")
+        ax_r.set_ylim(10, 90)
+        ax_r.legend(loc='upper left', facecolor='#111111')
+        ax_r.grid(True, color='#222222')
+        
+        st.pyplot(fig_ind)
+        
+        # Display localized dashboard overview states
+        latest_row = df_ind.iloc[-1]
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Live Market Value", f"${latest_row['close']:.2f}")
+        c2.metric(f"Active Fast MA ({fast_w})", f"${latest_row['Fast_MA']:.2f}")
+        c3.metric(f"Relative Strength Gauge ({rsi_w})", f"{latest_row['RSI']:.2f}")
+        
+    except Exception as ex:
+        st.error(f"Framework Engine Interrupted: {ex}")
 
 st.divider()
 st.markdown("<p style='text-align: center; color: #555555;'>--- Model By HRF ---</p>", unsafe_allow_html=True)
