@@ -79,10 +79,20 @@ def fetch_legacy_market_data(asset_name, interval_str):
         '1m': Interval.in_1_minute
     }
     tv_interval = interval_dict.get(interval_str, Interval.in_daily)
+    
+    # Scale depth request specifically to capture 2023-Today historical window
+    if interval_str == '5m':
+        bars_limit = 450000
+    elif interval_str == '15m':
+        bars_limit = 150000
+    elif interval_str == '1h':
+        bars_limit = 35000
+    else:
+        bars_limit = 4000
         
     try:
         tv = TvDatafeed()
-        df = tv.get_hist(symbol=symbol, exchange=exchange, interval=tv_interval, n_bars=4000)
+        df = tv.get_hist(symbol=symbol, exchange=exchange, interval=tv_interval, n_bars=bars_limit)
         if df is None or df.empty: return None
         
         df.index.name = 'time'
